@@ -37,11 +37,11 @@
       "path": "lang/en.json"
     }
   ],
-  "url": "https://github.com/simonalexross/npc-generator-5e",
-  "manifest": "https://raw.githubusercontent.com/simonalexross/npc-generator-5e/main/module.json",
-  "download": "https://github.com/simonalexross/npc-generator-5e/releases/latest/download/module.zip",
+  "url": "https://github.com/Sross89/npc-generator-5e",
+  "manifest": "https://raw.githubusercontent.com/Sross89/npc-generator-5e/main/module.json",
+  "download": "https://github.com/Sross89/npc-generator-5e/releases/latest/download/module.zip",
   "readme": "README.md",
   "license": "LICENSE",
-  "bugs": "https://github.com/simonalexross/npc-generator-5e/issues",
+  "bugs": "https://github.com/Sross89/npc-generator-5e/issues",
   "socket": false
 }

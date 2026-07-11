@@ -13,7 +13,7 @@ A Foundry VTT module that generates random D&D 5e NPC actors by challenge rating
 
 1. In Foundry's **Add-on Modules** tab, click **Install Module**.
 2. Paste this manifest URL:
-   `https://raw.githubusercontent.com/simonalexross/npc-generator-5e/main/module.json`
+   `https://raw.githubusercontent.com/Sross89/npc-generator-5e/main/module.json`
 3. Enable **NPC Generator for 5e** in your world's Module Management.
 
 ## Usage
