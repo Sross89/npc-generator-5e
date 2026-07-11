@@ -1,4 +1,4 @@
-import { MODULE_ID, ABILITY_KEYS } from "../constants.js";
+import { MODULE_ID, SETTINGS, ABILITY_KEYS } from "../constants.js";
 import { generateNPC, generateNPCFromTemplate } from "../generator.js";
 import { getAvailableBundledCRs } from "../statblocks.js";
 import { getActorCompendiums, getPackActorIndex } from "../compendium.js";
@@ -9,6 +9,8 @@ const ABILITY_FIELD_MAP = {
   str: "abilStr", dex: "abilDex", con: "abilCon",
   int: "abilInt", wis: "abilWis", cha: "abilCha"
 };
+
+const SELECTION_SEP = "::";
 
 function crToLabel(cr) {
   if (cr === 0.125) return "1/8";
@@ -39,7 +41,7 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     form: { template: `modules/${MODULE_ID}/templates/npc-generator.hbs` }
   };
 
-  /** Cache of the last-fetched pack index, keyed by packId, so actor selection needs no re-fetch. */
+  /** Cache of the last-fetched pack index, keyed by packId, so re-checking a box needs no re-fetch. */
   #indexCache = new Map();
 
   _onRender(context, options) {
@@ -54,8 +56,8 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const cultureFieldset = this.element.querySelector(".npc-gen-culture-fieldset");
     const nameModeSelect = this.element.querySelector('select[name="nameMode"]');
     const customNameRow = this.element.querySelector(".npc-gen-name-custom");
-    const packSelect = this.element.querySelector('select[name="packId"]');
-    const actorSelect = this.element.querySelector('select[name="actorId"]');
+    const packCheckboxes = () => Array.from(this.element.querySelectorAll(".npc-gen-pack-checkbox"));
+    const actorSelect = this.element.querySelector('select[name="actorSelection"]');
     const preview = this.element.querySelector("#npc-gen-actor-preview");
     const acOverride = this.element.querySelector("#npc-gen-ac-override");
     const hpOverride = this.element.querySelector("#npc-gen-hp-override");
@@ -79,11 +81,7 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
       applySourceVisibility();
     };
 
-    const clearActorSelect = (placeholderKey) => {
-      actorSelect.innerHTML = `<option value="">${game.i18n.localize(placeholderKey)}</option>`;
-      actorSelect.disabled = true;
-      preview.innerHTML = "";
-      preview.classList.remove("active");
+    const clearPlaceholders = () => {
       [acOverride, hpOverride].forEach(el => (el.placeholder = ""));
       ABILITY_KEYS.forEach(key => {
         const el = this.element.querySelector(`input[name="${ABILITY_FIELD_MAP[key]}"]`);
@@ -91,41 +89,26 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
       });
     };
 
-    const onPackChange = async () => {
-      const packId = packSelect.value;
-      if (!packId) {
-        clearActorSelect("NPC-GENERATOR-5E.App.SelectCompendiumFirst");
-        return;
-      }
+    const clearActorSelect = (placeholderKey) => {
+      actorSelect.innerHTML = `<option value="">${game.i18n.localize(placeholderKey)}</option>`;
       actorSelect.disabled = true;
-      actorSelect.innerHTML = `<option value="">${game.i18n.localize("NPC-GENERATOR-5E.App.LoadingActors")}</option>`;
+      preview.innerHTML = "";
+      preview.classList.remove("active");
+      clearPlaceholders();
+    };
 
-      let index = this.#indexCache.get(packId);
-      if (!index) {
-        index = await getPackActorIndex(packId);
-        this.#indexCache.set(packId, index);
-      }
-
-      if (!index.length) {
-        clearActorSelect("NPC-GENERATOR-5E.App.NoActorsInCompendium");
-        return;
-      }
-
-      actorSelect.innerHTML = index.map(entry =>
-        `<option value="${entry.id}">${entry.name}${entry.cr !== null ? ` (CR ${crToLabel(entry.cr)})` : ""}</option>`
-      ).join("");
-      actorSelect.disabled = false;
-      onActorChange();
+    const findEntry = (selectionValue) => {
+      const [packId, actorId] = (selectionValue || "").split(SELECTION_SEP);
+      const index = this.#indexCache.get(packId) ?? [];
+      return index.find(e => e.id === actorId);
     };
 
     const onActorChange = () => {
-      const packId = packSelect.value;
-      const index = this.#indexCache.get(packId) ?? [];
-      const entry = index.find(e => e.id === actorSelect.value);
-
+      const entry = findEntry(actorSelect.value);
       if (!entry) {
         preview.innerHTML = "";
         preview.classList.remove("active");
+        clearPlaceholders();
         return;
       }
 
@@ -140,19 +123,67 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
       hpOverride.placeholder = entry.hp ?? "";
     };
 
+    const refreshActorOptions = async () => {
+      const checkedPacks = packCheckboxes().filter(cb => cb.checked).map(cb => cb.value);
+      game.settings.set(MODULE_ID, SETTINGS.ENABLED_TEMPLATE_COMPENDIUMS, checkedPacks);
+
+      if (!checkedPacks.length) {
+        clearActorSelect("NPC-GENERATOR-5E.App.SelectCompendiumFirst");
+        return;
+      }
+
+      const previousSelection = actorSelect.value;
+      actorSelect.disabled = true;
+      actorSelect.innerHTML = `<option value="">${game.i18n.localize("NPC-GENERATOR-5E.App.LoadingActors")}</option>`;
+
+      const groups = [];
+      for (const packId of checkedPacks) {
+        let index = this.#indexCache.get(packId);
+        if (!index) {
+          index = await getPackActorIndex(packId);
+          this.#indexCache.set(packId, index);
+        }
+        if (index.length) {
+          const pack = game.packs.get(packId);
+          groups.push({ packId, label: pack?.title ?? packId, entries: index });
+        }
+      }
+
+      if (!groups.length) {
+        clearActorSelect("NPC-GENERATOR-5E.App.NoActorsInCompendium");
+        return;
+      }
+
+      actorSelect.innerHTML = groups.map(group => `
+        <optgroup label="${group.label}">
+          ${group.entries.map(entry => {
+            const value = `${group.packId}${SELECTION_SEP}${entry.id}`;
+            const crText = entry.cr !== null ? ` (CR ${crToLabel(entry.cr)})` : "";
+            return `<option value="${value}">${entry.name}${crText}</option>`;
+          }).join("")}
+        </optgroup>
+      `).join("");
+      actorSelect.disabled = false;
+
+      if (findEntry(previousSelection)) actorSelect.value = previousSelection;
+      onActorChange();
+    };
+
     sourceModeSelect.addEventListener("change", applySourceVisibility);
     crModeSelect.addEventListener("change", applyCRVisibility);
     nameModeSelect.addEventListener("change", applyNameModeVisibility);
-    packSelect.addEventListener("change", onPackChange);
+    packCheckboxes().forEach(cb => cb.addEventListener("change", refreshActorOptions));
     actorSelect.addEventListener("change", onActorChange);
 
     applyCRVisibility();
     applySourceVisibility();
     applyNameModeVisibility();
+    if (packCheckboxes().some(cb => cb.checked)) refreshActorOptions();
   }
 
   async _prepareContext() {
     const crOptions = await getAvailableBundledCRs();
+    const enabledPacks = game.settings.get(MODULE_ID, SETTINGS.ENABLED_TEMPLATE_COMPENDIUMS) ?? [];
     return {
       crModes: [
         { value: "exact", label: game.i18n.localize("NPC-GENERATOR-5E.App.ExactCR") },
@@ -161,7 +192,7 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
       ],
       crOptions: crOptions.map(cr => ({ value: cr, label: crToLabel(cr) })),
       cultures: ["human", "elf", "dwarf", "halfling", "orcish"],
-      compendiums: getActorCompendiums()
+      compendiums: getActorCompendiums().map(pack => ({ ...pack, checked: enabledPacks.includes(pack.id) }))
     };
   }
 
@@ -169,7 +200,8 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const data = formData.object;
 
     if (data.sourceMode === "template") {
-      if (!data.packId || !data.actorId) {
+      const [packId, actorId] = (data.actorSelection || "").split(SELECTION_SEP);
+      if (!packId || !actorId) {
         ui.notifications.warn(game.i18n.localize("NPC-GENERATOR-5E.Warnings.NoTemplateSelected"));
         return;
       }
@@ -180,8 +212,8 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
       }
 
       const params = {
-        packId: data.packId,
-        actorId: data.actorId,
+        packId,
+        actorId,
         nameMode: data.nameMode,
         customName: data.customName,
         abilityOverrides,

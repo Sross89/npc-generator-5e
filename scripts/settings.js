@@ -37,4 +37,14 @@ export function registerSettings() {
     type: Boolean,
     default: true
   });
+
+  // Remembers which Actor compendiums the GM has checked in the "Choose a Specific Actor"
+  // panel, so the checklist doesn't reset every time the generator is reopened. Managed
+  // entirely through the generator's own UI, not exposed in the Module Settings list.
+  game.settings.register(MODULE_ID, SETTINGS.ENABLED_TEMPLATE_COMPENDIUMS, {
+    scope: "client",
+    config: false,
+    type: Array,
+    default: []
+  });
 }

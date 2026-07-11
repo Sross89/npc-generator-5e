@@ -2,7 +2,7 @@
   "id": "npc-generator-5e",
   "title": "NPC Generator for 5e",
   "description": "Generate random 5e NPC actors by challenge rating, or from a specific compendium actor with overrides. Ships with SRD 5.1 open-content NPC stat blocks and generic name/flavor tables, with optional overrides to roll on your own RollTables/compendiums (e.g. built from published volumes you own).",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "compatibility": {
     "minimum": "13",
     "verified": "14"
