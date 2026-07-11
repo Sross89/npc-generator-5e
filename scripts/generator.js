@@ -2,6 +2,9 @@ import { MODULE_ID, SETTINGS, SIZE_MAP, SKILL_KEY_MAP, ABILITY_KEYS } from "./co
 import { generateName } from "./data/names.js";
 import { generateFlavor } from "./data/flavor.js";
 import { buildStatblockPool, filterPoolByCR } from "./statblocks.js";
+import { getPackActor } from "./compendium.js";
+
+const DEFAULT_IMG = "icons/svg/mystery-man.svg";
 
 /**
  * Resolve a name either from a configured world RollTable override or the bundled generic tables.
@@ -202,6 +205,27 @@ function buildActorDataFromStatblock(statblock, name, flavor) {
 }
 
 /**
+ * Append the rolled flavor package to an actor data object's existing biography, if the
+ * "append flavor" setting is enabled.
+ * @param {object} data
+ * @param {object} flavor
+ */
+function appendFlavorToBiography(data, flavor) {
+  const appendFlavor = game.settings.get(MODULE_ID, SETTINGS.APPEND_FLAVOR_TO_BIOGRAPHY);
+  if (!appendFlavor) return;
+  const existing = foundry.utils.getProperty(data, "system.details.biography.value") ?? "";
+  const block = [
+    `<p><strong>Occupation:</strong> ${flavor.occupation}</p>`,
+    `<p><strong>Personality:</strong> ${flavor.personalityTrait}</p>`,
+    `<p><strong>Ideal:</strong> ${flavor.ideal}</p>`,
+    `<p><strong>Bond:</strong> ${flavor.bond}</p>`,
+    `<p><strong>Flaw:</strong> ${flavor.flaw}</p>`,
+    `<p><strong>Quirk:</strong> ${flavor.quirk}</p>`
+  ].join("\n");
+  foundry.utils.setProperty(data, "system.details.biography.value", `${existing}\n${block}`);
+}
+
+/**
  * Clone a compendium override Actor as the generation source, re-rolling its name and biography.
  * @param {Actor} sourceActor
  * @param {string} name
@@ -212,17 +236,67 @@ function buildActorDataFromCompendium(sourceActor, name, flavor) {
   const data = sourceActor.toObject();
   delete data._id;
   data.name = name;
-  const appendFlavor = game.settings.get(MODULE_ID, SETTINGS.APPEND_FLAVOR_TO_BIOGRAPHY);
-  if (appendFlavor) {
-    const existing = data.system?.details?.biography?.value ?? "";
-    foundry.utils.setProperty(data, "system.details.biography.value",
-      `${existing}\n<p><strong>Occupation:</strong> ${flavor.occupation}</p>` +
-      `<p><strong>Personality:</strong> ${flavor.personalityTrait}</p>` +
-      `<p><strong>Ideal:</strong> ${flavor.ideal}</p>` +
-      `<p><strong>Bond:</strong> ${flavor.bond}</p>` +
-      `<p><strong>Flaw:</strong> ${flavor.flaw}</p>` +
-      `<p><strong>Quirk:</strong> ${flavor.quirk}</p>`);
+  appendFlavorToBiography(data, flavor);
+  return data;
+}
+
+/**
+ * Apply user-supplied ability score overrides (any subset of str/dex/con/int/wis/cha) onto
+ * actor create data. Blank/undefined entries are left untouched so the source value carries over.
+ * @param {object} data
+ * @param {object|null} abilityOverrides
+ */
+function applyAbilityOverrides(data, abilityOverrides) {
+  if (!abilityOverrides) return;
+  for (const key of ABILITY_KEYS) {
+    const value = abilityOverrides[key];
+    if (value === null || value === undefined || value === "") continue;
+    foundry.utils.setProperty(data, `system.abilities.${key}.value`, Number(value));
   }
+}
+
+/**
+ * Clone a specifically-chosen template Actor, applying whichever overrides the user supplied.
+ * @param {Actor} sourceActor
+ * @param {object} opts
+ * @param {string} opts.name
+ * @param {object} opts.flavor
+ * @param {object|null} [opts.abilityOverrides] any subset of {str,dex,con,int,wis,cha}
+ * @param {number|string|null} [opts.acOverride]
+ * @param {number|string|null} [opts.hpOverride]
+ * @param {boolean} [opts.includeItems=true] carry over the source actor's weapons/features
+ * @param {boolean} [opts.keepArtwork=true] carry over the source actor's portrait/token image
+ * @returns {object}
+ */
+function buildOverriddenActorData(sourceActor, {
+  name, flavor, abilityOverrides = null, acOverride = null, hpOverride = null,
+  includeItems = true, keepArtwork = true
+}) {
+  const data = sourceActor.toObject();
+  delete data._id;
+  data.name = name;
+
+  applyAbilityOverrides(data, abilityOverrides);
+
+  if (acOverride !== null && acOverride !== undefined && acOverride !== "") {
+    foundry.utils.setProperty(data, "system.attributes.ac.flat", Number(acOverride));
+    foundry.utils.setProperty(data, "system.attributes.ac.calc", "flat");
+  }
+
+  if (hpOverride !== null && hpOverride !== undefined && hpOverride !== "") {
+    foundry.utils.setProperty(data, "system.attributes.hp.value", Number(hpOverride));
+    foundry.utils.setProperty(data, "system.attributes.hp.max", Number(hpOverride));
+  }
+
+  if (!includeItems) data.items = [];
+
+  if (!keepArtwork) {
+    data.img = DEFAULT_IMG;
+    foundry.utils.setProperty(data, "prototypeToken.texture.src", DEFAULT_IMG);
+  }
+
+  if (flavor) appendFlavorToBiography(data, flavor);
+
   return data;
 }
 
@@ -252,6 +326,56 @@ export async function generateNPC({ exactCR = null, minCR = null, maxCR = null, 
   const actorData = chosen.source === "bundled"
     ? buildActorDataFromStatblock(chosen.statblock, name, flavor)
     : buildActorDataFromCompendium(chosen.actor, name, flavor);
+
+  return Actor.create(actorData, { renderSheet });
+}
+
+/**
+ * Generate an NPC Actor cloned from one specifically-chosen compendium template
+ * (e.g. "Guard" out of a Monster Manual compendium you own), with optional overrides.
+ * @param {object} params
+ * @param {string} params.packId compendium pack id, e.g. "dnd5e.monsters"
+ * @param {string} params.actorId id of the template Actor within that pack
+ * @param {"keep"|"random"|"custom"} [params.nameMode="keep"]
+ * @param {string} [params.customName] used when nameMode is "custom"
+ * @param {string} [params.culture] used when nameMode is "random"
+ * @param {object|null} [params.abilityOverrides] any subset of {str,dex,con,int,wis,cha}
+ * @param {number|string|null} [params.acOverride]
+ * @param {number|string|null} [params.hpOverride]
+ * @param {boolean} [params.includeItems=true]
+ * @param {boolean} [params.keepArtwork=true]
+ * @param {boolean} [params.renderSheet=true]
+ * @returns {Promise<Actor|null>}
+ */
+export async function generateNPCFromTemplate({
+  packId,
+  actorId,
+  nameMode = "keep",
+  customName = "",
+  culture = null,
+  abilityOverrides = null,
+  acOverride = null,
+  hpOverride = null,
+  includeItems = true,
+  keepArtwork = true,
+  renderSheet = true
+} = {}) {
+  const sourceActor = await getPackActor(packId, actorId);
+  if (!sourceActor) {
+    ui.notifications.warn(game.i18n.localize("NPC-GENERATOR-5E.Warnings.TemplateNotFound"));
+    return null;
+  }
+
+  let name;
+  if (nameMode === "custom" && customName.trim()) name = customName.trim();
+  else if (nameMode === "random") ({ name } = await resolveName(culture));
+  else name = sourceActor.name;
+
+  const flavor = generateFlavor();
+
+  const actorData = buildOverriddenActorData(sourceActor, {
+    name, flavor, abilityOverrides, acOverride, hpOverride, includeItems, keepArtwork
+  });
 
   return Actor.create(actorData, { renderSheet });
 }

@@ -1,5 +1,16 @@
 <div class="npc-generator-5e-form">
 <fieldset>
+  <legend>{{localize "NPC-GENERATOR-5E.App.SourceLegend"}}</legend>
+  <div class="form-group">
+    <label>{{localize "NPC-GENERATOR-5E.App.SourceMode"}}</label>
+    <select name="sourceMode" id="npc-gen-source-mode">
+      <option value="random">{{localize "NPC-GENERATOR-5E.App.SourceModeRandom"}}</option>
+      <option value="template">{{localize "NPC-GENERATOR-5E.App.SourceModeTemplate"}}</option>
+    </select>
+  </div>
+</fieldset>
+
+<fieldset class="npc-gen-mode-random">
   <legend>{{localize "NPC-GENERATOR-5E.App.CRLegend"}}</legend>
 
   <div class="form-group">
@@ -42,7 +53,93 @@
   </div>
 </fieldset>
 
-<fieldset>
+<fieldset class="npc-gen-mode-template">
+  <legend>{{localize "NPC-GENERATOR-5E.App.TemplateLegend"}}</legend>
+
+  <div class="form-group">
+    <label>{{localize "NPC-GENERATOR-5E.App.Compendium"}}</label>
+    <select name="packId" id="npc-gen-pack">
+      <option value="">{{localize "NPC-GENERATOR-5E.App.SelectCompendium"}}</option>
+      {{#each compendiums as |pack|}}
+        <option value="{{pack.id}}">{{pack.label}}</option>
+      {{/each}}
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>{{localize "NPC-GENERATOR-5E.App.TemplateActor"}}</label>
+    <select name="actorId" id="npc-gen-actor" disabled>
+      <option value="">{{localize "NPC-GENERATOR-5E.App.SelectCompendiumFirst"}}</option>
+    </select>
+  </div>
+
+  <div class="npc-gen-actor-preview" id="npc-gen-actor-preview"></div>
+
+  <div class="form-group">
+    <label>{{localize "NPC-GENERATOR-5E.App.NameMode"}}</label>
+    <select name="nameMode" id="npc-gen-name-mode">
+      <option value="keep">{{localize "NPC-GENERATOR-5E.App.NameModeKeep"}}</option>
+      <option value="random">{{localize "NPC-GENERATOR-5E.App.NameModeRandom"}}</option>
+      <option value="custom">{{localize "NPC-GENERATOR-5E.App.NameModeCustom"}}</option>
+    </select>
+  </div>
+
+  <div class="form-group npc-gen-name-custom">
+    <label>{{localize "NPC-GENERATOR-5E.App.CustomName"}}</label>
+    <input type="text" name="customName" placeholder="{{localize 'NPC-GENERATOR-5E.App.CustomNamePlaceholder'}}" />
+  </div>
+
+  <div class="npc-gen-overrides-legend">{{localize "NPC-GENERATOR-5E.App.OverridesHint"}}</div>
+
+  <div class="npc-gen-ability-grid">
+    <div class="form-group npc-gen-ability">
+      <label>{{localize "NPC-GENERATOR-5E.App.AbilStr"}}</label>
+      <input type="number" name="abilStr" />
+    </div>
+    <div class="form-group npc-gen-ability">
+      <label>{{localize "NPC-GENERATOR-5E.App.AbilDex"}}</label>
+      <input type="number" name="abilDex" />
+    </div>
+    <div class="form-group npc-gen-ability">
+      <label>{{localize "NPC-GENERATOR-5E.App.AbilCon"}}</label>
+      <input type="number" name="abilCon" />
+    </div>
+    <div class="form-group npc-gen-ability">
+      <label>{{localize "NPC-GENERATOR-5E.App.AbilInt"}}</label>
+      <input type="number" name="abilInt" />
+    </div>
+    <div class="form-group npc-gen-ability">
+      <label>{{localize "NPC-GENERATOR-5E.App.AbilWis"}}</label>
+      <input type="number" name="abilWis" />
+    </div>
+    <div class="form-group npc-gen-ability">
+      <label>{{localize "NPC-GENERATOR-5E.App.AbilCha"}}</label>
+      <input type="number" name="abilCha" />
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>{{localize "NPC-GENERATOR-5E.App.ACOverride"}}</label>
+    <input type="number" name="acOverride" id="npc-gen-ac-override" />
+  </div>
+
+  <div class="form-group">
+    <label>{{localize "NPC-GENERATOR-5E.App.HPOverride"}}</label>
+    <input type="number" name="hpOverride" id="npc-gen-hp-override" />
+  </div>
+
+  <div class="form-group">
+    <label>{{localize "NPC-GENERATOR-5E.App.IncludeItems"}}</label>
+    <input type="checkbox" name="includeItems" checked />
+  </div>
+
+  <div class="form-group">
+    <label>{{localize "NPC-GENERATOR-5E.App.KeepArtwork"}}</label>
+    <input type="checkbox" name="keepArtwork" checked />
+  </div>
+</fieldset>
+
+<fieldset class="npc-gen-culture-fieldset">
   <legend>{{localize "NPC-GENERATOR-5E.App.FlavorLegend"}}</legend>
   <div class="form-group">
     <label>{{localize "NPC-GENERATOR-5E.App.Culture"}}</label>

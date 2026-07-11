@@ -22,8 +22,14 @@
   flex: 0 0 45%;
 }
 
-.npc-generator-5e .form-group select {
+.npc-generator-5e .form-group select,
+.npc-generator-5e .form-group input {
   flex: 1;
+}
+
+.npc-generator-5e .form-group input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .npc-generator-5e .sheet-footer {
@@ -37,6 +43,47 @@
   margin-top: 4px;
 }
 
+.npc-generator-5e .hidden,
 .npc-generator-5e .form-group.hidden {
   display: none;
+}
+
+.npc-generator-5e .npc-gen-ability-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.3rem 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.npc-generator-5e .npc-gen-ability {
+  margin-bottom: 0;
+}
+
+.npc-generator-5e .npc-gen-ability label {
+  flex: 0 0 auto;
+}
+
+.npc-generator-5e .npc-gen-overrides-legend {
+  font-style: italic;
+  font-size: 0.85em;
+  opacity: 0.8;
+  margin: 0.4rem 0;
+}
+
+.npc-generator-5e .npc-gen-actor-preview {
+  display: none;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.npc-generator-5e .npc-gen-actor-preview.active {
+  display: flex;
+}
+
+.npc-generator-5e .npc-gen-actor-preview img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--color-border-light-tertiary, #782e22);
 }
