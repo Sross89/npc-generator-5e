@@ -38,7 +38,7 @@
     }
   ],
   "url": "https://github.com/Sross89/npc-generator-5e",
-  "manifest": "https://raw.githubusercontent.com/Sross89/npc-generator-5e/main/module.json",
+  "manifest": "https://raw.githubusercontent.com/Sross89/npc-generator-5e/master/module.json",
   "download": "https://github.com/Sross89/npc-generator-5e/releases/latest/download/module.zip",
   "readme": "README.md",
   "license": "LICENSE",
