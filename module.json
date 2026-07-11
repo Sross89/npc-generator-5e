@@ -1,0 +1,47 @@
+{
+  "id": "npc-generator-5e",
+  "title": "NPC Generator for 5e",
+  "description": "Generate random 5e NPC actors by challenge rating. Ships with SRD 5.1 open-content NPC stat blocks and generic name/flavor tables, with optional overrides to roll on your own RollTables (e.g. built from published volumes you own).",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "14"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "compatibility": {
+          "minimum": "4.0.0",
+          "verified": "5.3.0"
+        }
+      }
+    ]
+  },
+  "authors": [
+    {
+      "name": "Simon Ross"
+    }
+  ],
+  "esmodules": [
+    "scripts/module.js"
+  ],
+  "styles": [
+    "styles/npc-generator.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "url": "https://github.com/simonalexross/npc-generator-5e",
+  "manifest": "https://raw.githubusercontent.com/simonalexross/npc-generator-5e/main/module.json",
+  "download": "https://github.com/simonalexross/npc-generator-5e/releases/latest/download/module.zip",
+  "readme": "README.md",
+  "license": "LICENSE",
+  "bugs": "https://github.com/simonalexross/npc-generator-5e/issues",
+  "socket": false
+}

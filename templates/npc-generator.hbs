@@ -1,0 +1,62 @@
+<fieldset>
+  <legend>{{localize "NPC-GENERATOR-5E.App.CRLegend"}}</legend>
+
+  <div class="form-group">
+    <label>{{localize "NPC-GENERATOR-5E.App.CRMode"}}</label>
+    <select name="crMode" id="npc-gen-cr-mode">
+      {{#each crModes as |mode|}}
+        <option value="{{mode.value}}">{{mode.label}}</option>
+      {{/each}}
+    </select>
+  </div>
+
+  <div class="form-group npc-gen-cr-exact">
+    <label>{{localize "NPC-GENERATOR-5E.App.ExactCR"}}</label>
+    <select name="exactCR">
+      <option value="">{{localize "NPC-GENERATOR-5E.App.AnyValue"}}</option>
+      {{#each crOptions as |opt|}}
+        <option value="{{opt.value}}">{{opt.label}}</option>
+      {{/each}}
+    </select>
+  </div>
+
+  <div class="form-group npc-gen-cr-range">
+    <label>{{localize "NPC-GENERATOR-5E.App.MinCR"}}</label>
+    <select name="minCR">
+      <option value="">{{localize "NPC-GENERATOR-5E.App.AnyValue"}}</option>
+      {{#each crOptions as |opt|}}
+        <option value="{{opt.value}}">{{opt.label}}</option>
+      {{/each}}
+    </select>
+  </div>
+
+  <div class="form-group npc-gen-cr-range">
+    <label>{{localize "NPC-GENERATOR-5E.App.MaxCR"}}</label>
+    <select name="maxCR">
+      <option value="">{{localize "NPC-GENERATOR-5E.App.AnyValue"}}</option>
+      {{#each crOptions as |opt|}}
+        <option value="{{opt.value}}">{{opt.label}}</option>
+      {{/each}}
+    </select>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>{{localize "NPC-GENERATOR-5E.App.FlavorLegend"}}</legend>
+  <div class="form-group">
+    <label>{{localize "NPC-GENERATOR-5E.App.Culture"}}</label>
+    <select name="culture">
+      <option value="random">{{localize "NPC-GENERATOR-5E.App.RandomCulture"}}</option>
+      {{#each cultures as |culture|}}
+        <option value="{{culture}}">{{culture}}</option>
+      {{/each}}
+    </select>
+  </div>
+</fieldset>
+
+<footer class="sheet-footer">
+  <button type="submit">
+    <i class="fa-solid fa-dice-d20"></i>
+    {{localize "NPC-GENERATOR-5E.App.Generate"}}
+  </button>
+</footer>
