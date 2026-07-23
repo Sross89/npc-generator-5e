@@ -125,31 +125,23 @@
       {{/each}}
     </select>
   </div>
-</fieldset>
-
-<fieldset>
-  <legend>{{localize "NPC-GENERATOR-5E.App.SpeciesSetupLegend"}}</legend>
-
-  <div class="npc-gen-compendium-label">{{localize "NPC-GENERATOR-5E.App.SpeciesCompendiums"}}</div>
-  {{#if speciesCompendiums.length}}
-    <div class="npc-gen-compendium-checklist">
-      {{#each speciesCompendiums as |pack|}}
-        <label class="npc-gen-compendium-item">
-          <input type="checkbox" class="npc-gen-species-pack-checkbox" value="{{pack.id}}" {{#if pack.checked}}checked{{/if}} />
-          {{pack.label}}
-        </label>
+  <div class="form-group">
+    <label>{{localize "NPC-GENERATOR-5E.App.Species"}}</label>
+    <select name="speciesSelection">
+      <option value="random">{{localize "NPC-GENERATOR-5E.App.RandomSpecies"}}</option>
+      <option value="none">{{localize "NPC-GENERATOR-5E.App.NoneSpecies"}}</option>
+      {{#each speciesGroups as |group|}}
+        <optgroup label="{{group.label}}">
+          {{#each group.entries as |entry|}}
+            <option value="{{entry.value}}">{{entry.name}}</option>
+          {{/each}}
+        </optgroup>
       {{/each}}
-    </div>
-    <div class="form-group">
-      <label>{{localize "NPC-GENERATOR-5E.App.Species"}}</label>
-      <select name="speciesSelection">
-        <option value="random">{{localize "NPC-GENERATOR-5E.App.RandomSpecies"}}</option>
-        <option value="none">{{localize "NPC-GENERATOR-5E.App.NoneSpecies"}}</option>
-      </select>
-    </div>
-  {{else}}
-    <p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.App.NoSpeciesCompendiumsAvailable"}}</p>
-  {{/if}}
+    </select>
+  </div>
+  {{#unless hasSpeciesConfigured}}
+    <p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.App.NoSpeciesConfigured"}}</p>
+  {{/unless}}
 </fieldset>
 
 <footer class="sheet-footer">
@@ -212,7 +204,7 @@
         <p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.App.SpeciesAppliedHint"}}</p>
       {{/if}}
     {{else}}
-      <p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.App.NoSpeciesLinked"}}</p>
+      <p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.App.NoSpeciesConfigured"}}</p>
     {{/if}}
   </fieldset>
 
@@ -314,14 +306,28 @@
     <legend>{{localize "NPC-GENERATOR-5E.App.InventoryLegend"}}
       <button type="button" class="npc-gen-reroll" data-action="reroll-inventory" title="{{localize 'NPC-GENERATOR-5E.App.Reroll'}}"><i class="fa-solid fa-dice-d20"></i></button>
     </legend>
-    <div class="npc-gen-inventory-list">
-      {{#each draft.inventory as |item|}}
-        <div class="npc-gen-inventory-row">
-          <input type="text" data-inventory-index="{{item.index}}" value="{{item.text}}" />
-          <button type="button" class="npc-gen-remove" data-remove-item="{{item.index}}" title="{{localize 'NPC-GENERATOR-5E.App.RemoveItem'}}"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-      {{/each}}
-    </div>
+    {{#if draft.inventoryIsItems}}
+      <div class="npc-gen-inventory-list">
+        {{#each draft.inventoryItemRows as |item|}}
+          <div class="npc-gen-inventory-row">
+            <span class="npc-gen-inventory-item-name">{{item.name}}</span>
+            <button type="button" class="npc-gen-remove" data-remove-item="{{item.index}}" title="{{localize 'NPC-GENERATOR-5E.App.RemoveItem'}}"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        {{/each}}
+      </div>
+      {{#if draft.coin}}
+        <p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.App.Coin"}}: {{draft.coin}}</p>
+      {{/if}}
+    {{else}}
+      <div class="npc-gen-inventory-list">
+        {{#each draft.inventory as |item|}}
+          <div class="npc-gen-inventory-row">
+            <input type="text" data-inventory-index="{{item.index}}" value="{{item.text}}" />
+            <button type="button" class="npc-gen-remove" data-remove-item="{{item.index}}" title="{{localize 'NPC-GENERATOR-5E.App.RemoveItem'}}"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        {{/each}}
+      </div>
+    {{/if}}
     <button type="button" class="npc-gen-add-item" data-action="add-item"><i class="fa-solid fa-plus"></i> {{localize "NPC-GENERATOR-5E.App.AddItem"}}</button>
   </fieldset>
 

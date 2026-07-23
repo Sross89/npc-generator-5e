@@ -125,6 +125,15 @@ function sourceLabelFor(draft) {
   return `Compendium template: ${draft.chassis.sourceActor.name}`;
 }
 
+function inventoryLineFor(draft) {
+  if (draft.inventoryMode === "items") {
+    const names = (draft.inventoryItems ?? []).map(i => i.name);
+    if (draft.coin) names.push(draft.coin);
+    return names;
+  }
+  return draft.inventory ?? [];
+}
+
 function buildBiography(draft) {
   const sourceLabel = sourceLabelFor(draft);
   const { personality } = draft;
@@ -138,8 +147,9 @@ function buildBiography(draft) {
     `<p><strong>Flaw:</strong> ${personality.flaw}</p>`,
     `<p><strong>Quirk:</strong> ${personality.quirk}</p>`
   );
-  if (draft.inventory?.length) {
-    lines.push(`<p><strong>Inventory:</strong> ${draft.inventory.join(", ")}</p>`);
+  const inventoryLine = inventoryLineFor(draft);
+  if (inventoryLine.length) {
+    lines.push(`<p><strong>Inventory:</strong> ${inventoryLine.join(", ")}</p>`);
   }
   return lines.join("\n");
 }
@@ -161,13 +171,27 @@ function speciesItems(draft) {
   return [data];
 }
 
+/** Real Item documents carried in inventory (Items compendium linking), ready to embed. */
+function inventoryItemsData(draft) {
+  if (draft.inventoryMode !== "items") return [];
+  return (draft.inventoryItems ?? []).map(({ sourceItem }) => {
+    const data = sourceItem.toObject();
+    delete data._id;
+    return data;
+  });
+}
+
 function buildActorDataFromBundledDraft(draft) {
   const statblock = draft.chassis.statblock;
 
   return {
     name: draft.name,
     type: "npc",
-    items: [...(draft.includeItems ? buildItems(statblock) : []), ...speciesItems(draft)],
+    items: [
+      ...(draft.includeItems ? buildItems(statblock) : []),
+      ...speciesItems(draft),
+      ...inventoryItemsData(draft)
+    ],
     system: {
       abilities: buildAbilitiesData(draft),
       attributes: {
@@ -209,7 +233,7 @@ function buildActorDataFromCompendiumDraft(draft) {
   foundry.utils.setProperty(data, "system.attributes.senses.special", draft.stats.senses ?? "");
 
   if (!draft.includeItems) data.items = [];
-  data.items = [...data.items, ...speciesItems(draft)];
+  data.items = [...data.items, ...speciesItems(draft), ...inventoryItemsData(draft)];
 
   if (!draft.keepArtwork) {
     data.img = DEFAULT_IMG;
@@ -235,7 +259,11 @@ function archetypeToActions(chassis) {
   }));
 }
 
-/** Map a Quick Template archetype's rolled spell package into a flavor-text Spellcasting trait. */
+/**
+ * Map a Quick Template archetype's rolled spell package into a flavor-text Spellcasting
+ * trait. Only used as a fallback when no real Spell items were linked via Settings —
+ * see spellItemsData() for the real-item path.
+ */
 function archetypeToTraits(chassis) {
   if (!chassis.spellPackage) return [];
   const { cantrips, spells } = chassis.spellPackage;
@@ -246,14 +274,29 @@ function archetypeToTraits(chassis) {
   }];
 }
 
+/** Real Spell item documents linked via Settings, ready to embed. */
+function spellItemsData(chassis) {
+  if (!chassis.spellItems?.length) return [];
+  return chassis.spellItems.map(({ sourceItem }) => {
+    const data = sourceItem.toObject();
+    delete data._id;
+    return data;
+  });
+}
+
 function buildActorDataFromArchetypeDraft(draft) {
   const chassis = draft.chassis;
   const pseudoStatblock = { traits: archetypeToTraits(chassis), actions: archetypeToActions(chassis) };
 
-  return {
+  const data = {
     name: draft.name,
     type: "npc",
-    items: [...(draft.includeItems ? buildItems(pseudoStatblock) : []), ...speciesItems(draft)],
+    items: [
+      ...(draft.includeItems ? buildItems(pseudoStatblock) : []),
+      ...speciesItems(draft),
+      ...spellItemsData(chassis),
+      ...inventoryItemsData(draft)
+    ],
     system: {
       abilities: buildAbilitiesData(draft),
       attributes: {
@@ -275,6 +318,10 @@ function buildActorDataFromArchetypeDraft(draft) {
       skills: {}
     }
   };
+
+  if (chassis.casterAbility) data.system.attributes.spellcasting = chassis.casterAbility;
+
+  return data;
 }
 
 /**

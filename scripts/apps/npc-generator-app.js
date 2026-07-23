@@ -2,11 +2,12 @@ import { MODULE_ID, SETTINGS, ABILITY_KEYS } from "../constants.js";
 import {
   rollDraftRandom, rollDraftFromTemplate, rollDraftFromArchetype, rerollName, rerollGender,
   rerollOccupation, rerollAbilities, rerollStatSheet, rerollPersonality, rerollInventory,
-  rerollAllDraftFields, applySpecies, rerollSpecies, setSpecies
+  rerollAllDraftFields, applySpecies, rerollSpecies, setSpecies, getConfiguredSpeciesPool,
+  applyInventoryItems, addInventoryItem
 } from "../draft.js";
 import { createActorFromDraft } from "../generator.js";
 import { getAvailableBundledCRs } from "../statblocks.js";
-import { getActorCompendiums, getPackActorIndex, getItemCompendiums, getPackSpeciesIndex } from "../compendium.js";
+import { getActorCompendiums, getPackActorIndex } from "../compendium.js";
 import { getOccupationThemes } from "../data/occupations.js";
 import { getArchetypeOptions } from "../data/archetypes.js";
 import { getCRProfileOptions } from "../data/cr-profiles.js";
@@ -20,6 +21,23 @@ function crToLabel(cr) {
   if (cr === 0.25) return "1/4";
   if (cr === 0.5) return "1/2";
   return String(cr);
+}
+
+/** Group a flat pool of { packId, itemId, name } entries into per-compendium option groups for a <select>. */
+function groupPoolByPack(pool) {
+  const groups = [];
+  const byPack = new Map();
+  for (const entry of pool ?? []) {
+    if (!byPack.has(entry.packId)) byPack.set(entry.packId, []);
+    byPack.get(entry.packId).push(entry);
+  }
+  for (const [packId, entries] of byPack) {
+    groups.push({
+      label: game.packs.get(packId)?.title ?? packId,
+      entries: entries.map(e => ({ value: `${e.packId}${SELECTION_SEP}${e.itemId}`, name: e.name }))
+    });
+  }
+  return groups;
 }
 
 export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
@@ -38,11 +56,8 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     form: { template: `modules/${MODULE_ID}/templates/npc-generator.hbs` }
   };
 
-  /** Cache of the last-fetched compendium index, keyed by packId. */
+  /** Cache of the last-fetched compendium index, keyed by packId (Choose a Specific Actor mode). */
   #indexCache = new Map();
-
-  /** Cache of the last-fetched Species/Race compendium index, keyed by packId. */
-  #speciesIndexCache = new Map();
 
   /** The current draft NPC being reviewed, or null while on the setup screen. */
   #draft = null;
@@ -59,7 +74,7 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
   async _prepareContext() {
     const crOptions = await getAvailableBundledCRs();
     const enabledPacks = game.settings.get(MODULE_ID, SETTINGS.ENABLED_TEMPLATE_COMPENDIUMS) ?? [];
-    const enabledSpeciesPacks = game.settings.get(MODULE_ID, SETTINGS.ENABLED_SPECIES_COMPENDIUMS) ?? [];
+    const speciesGroups = groupPoolByPack(await getConfiguredSpeciesPool());
 
     const context = {
       crModes: [
@@ -73,7 +88,8 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
       compendiums: getActorCompendiums().map(pack => ({ ...pack, checked: enabledPacks.includes(pack.id) })),
       archetypes: getArchetypeOptions(),
       archetypeCROptions: getCRProfileOptions(),
-      speciesCompendiums: getItemCompendiums().map(pack => ({ ...pack, checked: enabledSpeciesPacks.includes(pack.id) })),
+      speciesGroups,
+      hasSpeciesConfigured: !!speciesGroups.length,
       draft: null
     };
 
@@ -95,18 +111,6 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
       cr = draft.chassis.sourceActor.system?.details?.cr;
     }
 
-    const speciesGroups = [];
-    const byPack = new Map();
-    for (const entry of draft.speciesPool ?? []) {
-      if (!byPack.has(entry.packId)) byPack.set(entry.packId, []);
-      byPack.get(entry.packId).push(entry);
-    }
-    for (const [packId, entries] of byPack) {
-      speciesGroups.push({
-        label: game.packs.get(packId)?.title ?? packId,
-        entries: entries.map(e => ({ value: `${e.packId}${SELECTION_SEP}${e.itemId}`, name: e.name }))
-      });
-    }
     return {
       chassisLabel,
       crLabel: cr !== undefined && cr !== null ? crToLabel(cr) : "?",
@@ -119,12 +123,15 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
       abilitiesList: ABILITY_KEYS.map(key => ({ key, label: key.toUpperCase(), value: draft.abilities[key] })),
       stats: draft.stats,
       personality: draft.personality,
+      inventoryIsItems: draft.inventoryMode === "items",
       inventory: draft.inventory.map((text, index) => ({ index, text })),
+      inventoryItemRows: (draft.inventoryItems ?? []).map((item, index) => ({ index, name: item.name })),
+      coin: draft.coin,
       includeItems: draft.includeItems,
       keepArtwork: draft.keepArtwork,
       species: draft.species ? { name: draft.species.name, img: draft.species.img } : null,
       hasSpeciesPool: !!draft.speciesPool?.length,
-      speciesGroups
+      speciesGroups: groupPoolByPack(draft.speciesPool)
     };
   }
 
@@ -154,7 +161,6 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const themeSelect = el.querySelector('select[name="theme"]');
     const archetypeSelect = el.querySelector('select[name="archetypeId"]');
     const archetypeCRSelect = el.querySelector('select[name="archetypeCR"]');
-    const speciesPackCheckboxes = () => Array.from(el.querySelectorAll(".npc-gen-species-pack-checkbox"));
     const speciesSelect = el.querySelector('select[name="speciesSelection"]');
     const rollButton = el.querySelector('[data-action="roll"]');
 
@@ -243,72 +249,19 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
       onActorChange();
     };
 
-    const findSpeciesEntry = (selectionValue) => {
-      if (!selectionValue || selectionValue === "random" || selectionValue === "none") return null;
-      const [packId, itemId] = selectionValue.split(SELECTION_SEP);
-      const index = this.#speciesIndexCache.get(packId) ?? [];
-      return index.find(e => e.itemId === itemId);
-    };
-
-    const refreshSpeciesOptions = async () => {
-      const checkedPacks = speciesPackCheckboxes().filter(cb => cb.checked).map(cb => cb.value);
-      game.settings.set(MODULE_ID, SETTINGS.ENABLED_SPECIES_COMPENDIUMS, checkedPacks);
-      if (!speciesSelect) return;
-
-      const baseOptions = `
-        <option value="random">${game.i18n.localize("NPC-GENERATOR-5E.App.RandomSpecies")}</option>
-        <option value="none">${game.i18n.localize("NPC-GENERATOR-5E.App.NoneSpecies")}</option>
-      `;
-
-      if (!checkedPacks.length) {
-        speciesSelect.innerHTML = baseOptions;
-        speciesSelect.value = "none";
-        this.#setup.speciesSelection = "none";
-        return;
-      }
-
-      const previousSelection = speciesSelect.value;
-      const groups = [];
-      for (const packId of checkedPacks) {
-        let index = this.#speciesIndexCache.get(packId);
-        if (!index) {
-          index = await getPackSpeciesIndex(packId);
-          this.#speciesIndexCache.set(packId, index);
-        }
-        if (index.length) {
-          const pack = game.packs.get(packId);
-          groups.push({ label: pack?.title ?? packId, entries: index });
-        }
-      }
-
-      speciesSelect.innerHTML = baseOptions + groups.map(group => `
-        <optgroup label="${group.label}">
-          ${group.entries.map(entry => {
-            const value = `${entry.packId}${SELECTION_SEP}${entry.itemId}`;
-            return `<option value="${value}">${entry.name}</option>`;
-          }).join("")}
-        </optgroup>
-      `).join("");
-
-      speciesSelect.value = (previousSelection === "random" || previousSelection === "none" || findSpeciesEntry(previousSelection))
-        ? previousSelection
-        : "random";
-      this.#setup.speciesSelection = speciesSelect.value;
-    };
-
     sourceModeSelect.value = this.#setup.sourceMode;
     crModeSelect.value = this.#setup.crMode;
     if (cultureSelect) cultureSelect.value = this.#setup.culture;
     if (themeSelect) themeSelect.value = this.#setup.theme;
     if (archetypeSelect) archetypeSelect.value = this.#setup.archetypeId;
     if (archetypeCRSelect) archetypeCRSelect.value = this.#setup.archetypeCR;
+    if (speciesSelect) speciesSelect.value = this.#setup.speciesSelection;
     const exactCRSelect = el.querySelector('select[name="exactCR"]');
     const minCRSelect = el.querySelector('select[name="minCR"]');
     const maxCRSelect = el.querySelector('select[name="maxCR"]');
     if (exactCRSelect) exactCRSelect.value = this.#setup.exactCR;
     if (minCRSelect) minCRSelect.value = this.#setup.minCR;
     if (maxCRSelect) maxCRSelect.value = this.#setup.maxCR;
-    if (speciesSelect) speciesSelect.value = this.#setup.speciesSelection;
 
     sourceModeSelect.addEventListener("change", () => {
       this.#setup.sourceMode = sourceModeSelect.value;
@@ -325,31 +278,14 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     themeSelect?.addEventListener("change", e => (this.#setup.theme = e.target.value));
     archetypeSelect?.addEventListener("change", e => (this.#setup.archetypeId = e.target.value));
     archetypeCRSelect?.addEventListener("change", e => (this.#setup.archetypeCR = e.target.value));
+    speciesSelect?.addEventListener("change", e => (this.#setup.speciesSelection = e.target.value));
     packCheckboxes().forEach(cb => cb.addEventListener("change", refreshActorOptions));
     actorSelect.addEventListener("change", onActorChange);
-    speciesPackCheckboxes().forEach(cb => cb.addEventListener("change", refreshSpeciesOptions));
-    speciesSelect?.addEventListener("change", () => (this.#setup.speciesSelection = speciesSelect.value));
     rollButton.addEventListener("click", () => this.#onRoll());
 
     applyCRVisibility();
     applySourceVisibility();
     if (packCheckboxes().some(cb => cb.checked)) refreshActorOptions();
-    if (speciesPackCheckboxes().some(cb => cb.checked)) refreshSpeciesOptions();
-  }
-
-  /** Build the combined species pool from whichever Species compendiums are currently checked. */
-  async #buildSpeciesPool() {
-    const checkedPacks = game.settings.get(MODULE_ID, SETTINGS.ENABLED_SPECIES_COMPENDIUMS) ?? [];
-    const pool = [];
-    for (const packId of checkedPacks) {
-      let index = this.#speciesIndexCache.get(packId);
-      if (!index) {
-        index = await getPackSpeciesIndex(packId);
-        this.#speciesIndexCache.set(packId, index);
-      }
-      pool.push(...index);
-    }
-    return pool;
   }
 
   async #onRoll() {
@@ -386,14 +322,14 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     if (!draft) return;
 
-    const speciesPool = await this.#buildSpeciesPool();
     let selection = "random";
     if (speciesSelection === "none") selection = "none";
     else if (speciesSelection && speciesSelection !== "random") {
       const [speciesPackId, speciesItemId] = speciesSelection.split(SELECTION_SEP);
       selection = { packId: speciesPackId, itemId: speciesItemId };
     }
-    await applySpecies(draft, speciesPool, selection);
+    await applySpecies(draft, selection);
+    await applyInventoryItems(draft);
 
     this.#draft = draft;
     this.render();
@@ -443,13 +379,16 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     el.querySelectorAll("[data-remove-item]").forEach(button => {
       button.addEventListener("click", () => {
-        this.#draft.inventory.splice(Number(button.dataset.removeItem), 1);
+        const index = Number(button.dataset.removeItem);
+        if (this.#draft.inventoryMode === "items") this.#draft.inventoryItems.splice(index, 1);
+        else this.#draft.inventory.splice(index, 1);
         this.render();
       });
     });
 
-    el.querySelector('[data-action="add-item"]')?.addEventListener("click", () => {
-      this.#draft.inventory.push("");
+    el.querySelector('[data-action="add-item"]')?.addEventListener("click", async () => {
+      if (this.#draft.inventoryMode === "items") await addInventoryItem(this.#draft);
+      else this.#draft.inventory.push("");
       this.render();
     });
 
@@ -463,9 +402,9 @@ export class NPCGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     el.querySelector('[data-action="reroll-gender"]')?.addEventListener("click", reroll(rerollGender));
     el.querySelector('[data-action="reroll-occupation"]')?.addEventListener("click", reroll(rerollOccupation));
     el.querySelector('[data-action="reroll-abilities"]')?.addEventListener("click", reroll(rerollAbilities));
-    el.querySelector('[data-action="reroll-stats"]')?.addEventListener("click", reroll(rerollStatSheet));
+    el.querySelector('[data-action="reroll-stats"]')?.addEventListener("click", reroll(rerollStatSheet, true));
     el.querySelector('[data-action="reroll-personality"]')?.addEventListener("click", reroll(rerollPersonality));
-    el.querySelector('[data-action="reroll-inventory"]')?.addEventListener("click", reroll(rerollInventory));
+    el.querySelector('[data-action="reroll-inventory"]')?.addEventListener("click", reroll(rerollInventory, true));
     el.querySelector('[data-action="reroll-species"]')?.addEventListener("click", reroll(rerollSpecies, true));
     el.querySelector('[data-action="reroll-all"]')?.addEventListener("click", reroll(rerollAllDraftFields, true));
 

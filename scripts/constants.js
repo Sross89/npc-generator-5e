@@ -5,7 +5,9 @@ export const SETTINGS = {
   INCLUDE_BUNDLED_SRD: "includeBundledSrd",
   CUSTOM_STATBLOCK_PACK: "customStatblockPack",
   ENABLED_TEMPLATE_COMPENDIUMS: "enabledTemplateCompendiums",
-  ENABLED_SPECIES_COMPENDIUMS: "enabledSpeciesCompendiums"
+  SPECIES_COMPENDIUMS: "speciesCompendiums",
+  ITEM_COMPENDIUMS: "itemCompendiums",
+  SPELL_COMPENDIUMS: "spellCompendiums"
 };
 
 export const SIZE_MAP = {

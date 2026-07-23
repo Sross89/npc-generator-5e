@@ -53,7 +53,7 @@ function pickSeveral(list, count) {
   return picked;
 }
 
-function rollCoin() {
+export function rollCoin() {
   const gp = Math.floor(Math.random() * 6);
   const sp = Math.floor(Math.random() * 12);
   if (gp === 0 && sp === 0) return "a couple of copper pieces";

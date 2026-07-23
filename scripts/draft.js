@@ -2,13 +2,13 @@ import { ABILITY_KEYS, MODULE_ID, SETTINGS } from "./constants.js";
 import { generateName } from "./data/names.js";
 import { generateFlavor } from "./data/flavor.js";
 import { generateOccupation } from "./data/occupations.js";
-import { generateInventory } from "./data/inventory.js";
+import { generateInventory, rollCoin } from "./data/inventory.js";
 import { rollAbilities, rollPrioritizedAbilities } from "./data/abilities.js";
 import { ARCHETYPES, ARMOR_AC_MODIFIER } from "./data/archetypes.js";
 import { getCRProfile } from "./data/cr-profiles.js";
 import { generateSpellPackage } from "./data/spells.js";
 import { buildStatblockPool, filterPoolByCR } from "./statblocks.js";
-import { getPackActor, getPackItem } from "./compendium.js";
+import { getPackActor, getPackItem, getPackSpeciesIndex, getPackEquipmentIndex, getPackSpellIndex } from "./compendium.js";
 
 /**
  * An in-memory, fully-editable "draft" NPC: everything rolled here can be hand-edited
@@ -23,6 +23,24 @@ function pickGender() {
 
 function parseSpeed(speedText) {
   return Number((speedText || "30").match(/\d+/)?.[0]) || 30;
+}
+
+function pickSeveral(list, count) {
+  const pool = [...list];
+  const picked = [];
+  for (let i = 0; i < count && pool.length; i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    picked.push(pool.splice(idx, 1)[0]);
+  }
+  return picked;
+}
+
+/** Fetch every configured pack's index for a given SETTINGS key and index-fetching function, combined into one pool. */
+async function buildLinkedPool(settingsKey, fetchIndex) {
+  const packIds = game.settings.get(MODULE_ID, settingsKey) ?? [];
+  const pool = [];
+  for (const packId of packIds) pool.push(...(await fetchIndex(packId)));
+  return pool;
 }
 
 /**
@@ -74,11 +92,41 @@ function chassisFromActor(actor) {
   };
 }
 
-function chassisFromArchetype(archetypeId, cr) {
+/**
+ * Roll a small package of real Spell items appropriate to a CR, from whichever
+ * Spell compendiums are linked in Settings. Returns null if none are linked or
+ * none match, so the caller can fall back to flavor-text-only spell names.
+ */
+async function rollLinkedSpells(cr) {
+  const pool = await buildLinkedPool(SETTINGS.SPELL_COMPENDIUMS, getPackSpellIndex);
+  if (!pool.length) return null;
+
+  const byLevel = (level) => pool.filter(e => e.level === level);
+  const picks = pickSeveral(byLevel(0), 3);
+  if (cr >= 1) picks.push(...pickSeveral(byLevel(1), 2), ...pickSeveral(byLevel(2), 1));
+  if (cr >= 5) picks.push(...pickSeveral(byLevel(3), 1), ...pickSeveral(byLevel(4), 1));
+  if (!picks.length) return null;
+
+  const items = (await Promise.all(picks.map(async entry => {
+    const item = await getPackItem(entry.packId, entry.itemId);
+    return item ? { name: item.name, sourceItem: item } : null;
+  }))).filter(Boolean);
+
+  return items.length ? items : null;
+}
+
+async function chassisFromArchetype(archetypeId, cr) {
   const archetype = ARCHETYPES[archetypeId];
   const profile = getCRProfile(cr);
   const abilities = rollPrioritizedAbilities(archetype.priority);
   const passivePerception = 10 + Math.floor(((abilities.wis ?? 10) - 10) / 2);
+
+  let spellItems = null;
+  let spellPackage = null;
+  if (archetype.caster) {
+    spellItems = await rollLinkedSpells(Number(cr));
+    if (!spellItems) spellPackage = generateSpellPackage(archetype.caster, Number(cr));
+  }
 
   return {
     type: "archetype",
@@ -94,7 +142,9 @@ function chassisFromArchetype(archetypeId, cr) {
     attackBonus: profile.attackBonus,
     damageBonus: profile.damageBonus,
     saveDC: profile.saveDC,
-    spellPackage: archetype.caster ? generateSpellPackage(archetype.caster, Number(cr)) : null
+    casterAbility: archetype.caster?.ability ?? null,
+    spellPackage,
+    spellItems
   };
 }
 
@@ -116,7 +166,11 @@ async function buildDraft(chassis, {
     abilities: { ...chassis.abilities },
     stats: { ac: chassis.ac, hp: chassis.hp, speed: chassis.speed, senses: chassis.senses },
     personality: generateFlavor(),
+    inventoryMode: "flavor",
     inventory: generateInventory(theme),
+    inventoryItems: [],
+    inventoryPool: [],
+    coin: null,
     includeItems,
     keepArtwork,
     species: null,
@@ -158,7 +212,7 @@ export async function rollDraftFromTemplate({
  * @returns {Promise<object>}
  */
 export async function rollDraftFromArchetype({ archetypeId, cr, culture = null, theme = null, gender = null } = {}) {
-  const chassis = chassisFromArchetype(archetypeId, cr);
+  const chassis = await chassisFromArchetype(archetypeId, cr);
   return buildDraft(chassis, { culture, gender, theme, pool: null });
 }
 
@@ -187,9 +241,9 @@ export function rerollAbilities(draft) {
  * freshly-generated instance of the same archetype+CR (Quick Template). No-op (returns
  * false) for a specifically-chosen compendium actor, since that pick was deliberate.
  */
-export function rerollStatSheet(draft) {
+export async function rerollStatSheet(draft) {
   if (draft.chassis.type === "archetype") {
-    const chassis = chassisFromArchetype(draft.chassis.archetypeId, draft.chassis.cr);
+    const chassis = await chassisFromArchetype(draft.chassis.archetypeId, draft.chassis.cr);
     draft.chassis = chassis;
     draft.abilities = { ...chassis.abilities };
     draft.stats = { ac: chassis.ac, hp: chassis.hp, speed: chassis.speed, senses: chassis.senses };
@@ -209,7 +263,50 @@ export function rerollPersonality(draft) {
   draft.personality = generateFlavor();
 }
 
-export function rerollInventory(draft) {
+// ---------------------------------------------------------------------
+// Inventory linking: if Item compendiums are wired up in Settings, inventory is
+// drawn from real Item documents instead of the generated flavor-text list.
+// ---------------------------------------------------------------------
+
+async function pickInventoryItems(draft, pool) {
+  const picks = pickSeveral(pool, Math.min(3, pool.length));
+  const items = (await Promise.all(picks.map(async entry => {
+    const item = await getPackItem(entry.packId, entry.itemId);
+    return item ? { name: item.name, img: item.img, sourceItem: item } : null;
+  }))).filter(Boolean);
+  draft.inventoryItems = items;
+  draft.coin = rollCoin();
+}
+
+/** Check the linked Item compendiums and switch the draft to real-item inventory if any are configured. */
+export async function applyInventoryItems(draft) {
+  const pool = await buildLinkedPool(SETTINGS.ITEM_COMPENDIUMS, getPackEquipmentIndex);
+  draft.inventoryPool = pool;
+  if (!pool.length) return;
+
+  draft.inventoryMode = "items";
+  await pickInventoryItems(draft, pool);
+}
+
+/** Add one more random item from the linked pool, not already carried. Items mode only. */
+export async function addInventoryItem(draft) {
+  if (draft.inventoryMode !== "items" || !draft.inventoryPool?.length) return;
+  const carriedIds = new Set(draft.inventoryItems.map(i => i.sourceItem.id));
+  const available = draft.inventoryPool.filter(e => !carriedIds.has(e.itemId));
+  if (!available.length) return;
+
+  const entry = available[Math.floor(Math.random() * available.length)];
+  const item = await getPackItem(entry.packId, entry.itemId);
+  if (item) draft.inventoryItems.push({ name: item.name, img: item.img, sourceItem: item });
+}
+
+export async function rerollInventory(draft) {
+  if (draft.inventoryMode === "items") {
+    const pool = draft.inventoryPool?.length ? draft.inventoryPool : await buildLinkedPool(SETTINGS.ITEM_COMPENDIUMS, getPackEquipmentIndex);
+    draft.inventoryPool = pool;
+    await pickInventoryItems(draft, pool);
+    return;
+  }
   draft.inventory = generateInventory(draft.theme);
 }
 
@@ -219,18 +316,18 @@ export async function rerollAllDraftFields(draft) {
   await rerollName(draft);
   rerollOccupation(draft);
   rerollAbilities(draft);
-  rerollStatSheet(draft);
+  await rerollStatSheet(draft);
   rerollPersonality(draft);
-  rerollInventory(draft);
+  await rerollInventory(draft);
   await rerollSpecies(draft);
 }
 
 // ---------------------------------------------------------------------
 // Species linking: an optional Species/Race Item, drawn from whichever Item
-// compendium(s) the GM has checked, embedded onto the actor at creation time.
-// Ability score increases and choice-based traits still go through dnd5e's own
-// Advancement UI on the sheet afterward — this module only picks and embeds
-// the item itself.
+// compendium(s) are wired up in Settings, embedded onto the actor at creation
+// time. Ability score increases and choice-based traits still go through
+// dnd5e's own Advancement UI on the sheet afterward — this module only picks
+// and embeds the item itself.
 // ---------------------------------------------------------------------
 
 async function loadSpecies(entry) {
@@ -239,18 +336,22 @@ async function loadSpecies(entry) {
   return item ? { name: item.name, img: item.img, sourceItem: item } : null;
 }
 
-function pickRandomSpeciesEntry(pool) {
+function pickRandomEntry(pool) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+/** The combined pool of species available from whichever compendiums are linked in Settings. */
+export async function getConfiguredSpeciesPool() {
+  return buildLinkedPool(SETTINGS.SPECIES_COMPENDIUMS, getPackSpeciesIndex);
+}
+
 /**
- * Resolve and attach the draft's species, given the pool of species assembled from
- * whichever compendiums are checked in setup.
+ * Resolve and attach the draft's species from the Settings-configured pool.
  * @param {object} draft
- * @param {object[]} speciesPool entries shaped like { packId, itemId, name, img }
- * @param {"random"|"none"|{packId,itemId}|null} [selection] "random" (default) or "none", or a specific entry
+ * @param {"random"|"none"|{packId,itemId}} [selection] "random" (default) or "none", or a specific entry
  */
-export async function applySpecies(draft, speciesPool, selection = "random") {
+export async function applySpecies(draft, selection = "random") {
+  const speciesPool = await getConfiguredSpeciesPool();
   draft.speciesPool = speciesPool;
   if (!speciesPool.length || selection === "none") {
     draft.species = null;
@@ -261,16 +362,16 @@ export async function applySpecies(draft, speciesPool, selection = "random") {
     ? speciesPool.find(e => e.packId === selection.packId && e.itemId === selection.itemId)
     : null;
 
-  draft.species = await loadSpecies(entry ?? pickRandomSpeciesEntry(speciesPool));
+  draft.species = await loadSpecies(entry ?? pickRandomEntry(speciesPool));
 }
 
-/** Pick a new random species from the draft's own species pool. No-op if no compendiums were linked. */
+/** Pick a new random species from the draft's own species pool. No-op if none are linked. */
 export async function rerollSpecies(draft) {
   if (!draft.speciesPool?.length) {
     draft.species = null;
     return;
   }
-  draft.species = await loadSpecies(pickRandomSpeciesEntry(draft.speciesPool));
+  draft.species = await loadSpecies(pickRandomEntry(draft.speciesPool));
 }
 
 /**

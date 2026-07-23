@@ -170,6 +170,10 @@
   flex: 1;
 }
 
+.npc-generator-5e .npc-gen-inventory-item-name {
+  flex: 1;
+}
+
 .npc-generator-5e .npc-gen-remove {
   flex: 0 0 auto;
   width: 1.8rem;

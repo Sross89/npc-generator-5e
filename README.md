@@ -12,7 +12,12 @@ A Foundry VTT module that generates random D&D 5e NPC actors by challenge rating
 - Ships with all 20 SRD 5.1 open-content "NPC" stat blocks (Commoner, Guard, Scout, Thug, Cultist, Cult Fanatic, Bandit, Bandit Captain, Berserker, Tribal Warrior, Veteran, Acolyte, Priest, Mage, Archmage, Assassin, Spy, Gladiator, Knight, Noble) spanning CR 0–12, so Random-by-CR works out of the box with no other content owned.
 - **Occupation themes** — pick a theme (Tavern & Inn, Farm & Rural, Military & Guard, Criminal & Underworld, Noble Court, Dock & Sailor, Religious, Scholarly & Arcane, Artisan & Trade, Wilderness, Entertainer & Street) so a rolled occupation actually fits the setting, instead of a tavern worker rolling "Advisor to the King." Inventory items are drawn from the same theme.
 - **Inventory with the occasional hook** — a few theme-appropriate mundane items, some pocket coin, and roughly a 1-in-5 chance of a notable trinket (a jeweled ring, a tiny statuette of some god, a key that doesn't fit anything nearby) for an NPC who looks poor but is carrying something interesting.
-- **Link your own Species compendium** — check any Item compendium containing Species/Race items (a homebrew pack, a published-content pack you own, etc.) under Setup → Species, and generated NPCs get a species pulled from it (random, a specific pick, or none), across all three generation modes. The actual Species item — with its ability score increases and traits — gets embedded on the actor exactly as it's defined in your compendium; this module doesn't try to parse or apply those effects itself, so open the actor sheet's Advancements afterward to finish any choice-based ones (an ASI pick, a skill choice, etc.), same as dropping the item on any actor normally would require.
+- **Compendium Links (Module Settings)** — wire up your own Item compendiums once, under **Configure Settings → Compendium Links**, instead of picking them every time you roll:
+  - **Species** — linked Species/Race items appear in the generator's Species dropdown and get embedded on generated NPCs, across all three generation modes. This module doesn't parse or apply the item's ability score increases or choice-based traits itself — that's dnd5e's own Advancement system, so open the actor sheet's Advancements after creation to finish those, same as dropping the item on any actor normally would require.
+  - **Equipment** — if any compendium is linked here, generated NPCs carry real Items pulled from it instead of the built-in flavor-text inventory list.
+  - **Spells** — if any compendium is linked here, Quick Template spellcasters (Cultist, Priest, Mage) get real, castable Spell items pulled from it (matched to a CR-appropriate level) instead of flavor-text spell names, and the actor's spellcasting ability is set so its save DC computes correctly.
+  
+  Nothing needs to be configured — with no compendiums linked, species/inventory/spells all fall back to their original flavor-text-only behavior.
 - **Bring your own tables**: point the module at a RollTable you own (e.g. built from a published sourcebook) to override name generation, and/or at an Actor compendium (e.g. one you've built or purchased, drawn from any published volume you own) to use as additional or alternative CR-bucketed generation sources in Random-by-CR mode. The module never bundles or redistributes copyrighted book content itself — only open SRD content and original tables — but happily uses your own legitimately-owned content (like an official Monster Manual compendium) if you wire it in or select it directly.
 
 ## Installation
@@ -26,16 +31,16 @@ A Foundry VTT module that generates random D&D 5e NPC actors by challenge rating
 
 As GM, open the **Actors** directory sidebar tab and click the **Generate NPC** button at the bottom.
 
-**Setup screen:** choose Random by CR (with a CR mode), Quick Template (archetype + CR), or Choose a Specific Actor (check compendiums, pick an actor), plus an optional name Culture, Occupation Theme, and Species (check any Item compendium holding Species/Race items, then pick a specific one or leave it on "Random from checked"), then click **Roll NPC**.
+**Setup screen:** choose Random by CR (with a CR mode), Quick Template (archetype + CR), or Choose a Specific Actor (check compendiums, pick an actor), plus an optional name Culture, Occupation Theme, and Species (a plain dropdown — "Random from linked," "None," or a specific species by name — populated from whatever you've wired up under Compendium Links), then click **Roll NPC**.
 
 **Review screen:** every field is editable directly, and each section has a dice-icon reroll button next to its heading:
 - **Name** and **Gender** — reroll independently; changing Gender doesn't auto-change the name, reroll Name afterward if you want them to match.
-- **Species** — pick a different one from the same checked compendiums directly in the dropdown, reroll for a new random pick, or set it to "None." Only active if you linked a Species compendium in Setup.
+- **Species** — pick a different one directly in the dropdown, reroll for a new random pick, or set it to "None." Only active if you've linked a Species compendium under Compendium Links.
 - **Occupation** — change the Theme dropdown, then reroll Occupation to pull from the new theme.
 - **Abilities** — all six scores reroll together. For Random by CR / Choose a Specific Actor this is a plain 4d6-drop-lowest per score; for Quick Template it's the same roll but assigned highest-to-lowest down the archetype's priority order (so a Mage's reroll still comes out INT-primary).
 - **Stat Sheet** — AC, HP, Speed, and Senses reroll together: Random by CR picks a new base creature from the roll pool, Quick Template regenerates from the same archetype+CR, and it's disabled when the NPC came from a specifically-chosen actor.
 - **Quirks & Personality** — trait, ideal, bond, flaw, and quirk reroll together as one package.
-- **Inventory** — add/remove/edit lines freely, or reroll the whole list.
+- **Inventory** — if no Equipment compendium is linked, add/remove/edit flavor-text lines freely, or reroll the whole list. If one is linked, the list shows real Items instead — remove or reroll to swap them for a fresh random set, and Add Item pulls one more from the linked compendium.
 
 **Reroll All** re-rolls every section at once. **Start Over** discards the draft and returns to the setup screen. **Create Actor** writes the current draft to a new Actor and opens its sheet — anything not covered by these fields can still be tweaked afterward on the sheet, as usual.
 
@@ -69,6 +74,7 @@ await game.modules.get("npc-generator-5e").api.generateNPCFromArchetype({
 
 Configured under **Configure Settings → Module Settings**:
 
+- **Compendium Links** (button, opens a config screen) — checklists to wire up which Item compendiums supply Species, Equipment, and Spells. See Features above.
 - **Include Bundled SRD Stat Blocks** — toggle the built-in SRD pool on/off.
 - **Custom Stat Block Compendium** — pack ID (e.g. `world.my-npcs`) of an Actor compendium to draw additional/alternative templates from, bucketed automatically by each actor's `system.details.cr`.
 - **Name RollTable Override** — UUID of a RollTable to draw names from instead of the bundled name lists.

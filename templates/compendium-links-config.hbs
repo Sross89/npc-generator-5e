@@ -1,0 +1,59 @@
+<div class="npc-gen-links-form">
+<p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.CompendiumLinks.Hint"}}</p>
+
+{{#unless hasPacks}}
+<p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.CompendiumLinks.NoPacks"}}</p>
+{{/unless}}
+
+<fieldset>
+  <legend>{{localize "NPC-GENERATOR-5E.CompendiumLinks.SpeciesLegend"}}</legend>
+  <p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.CompendiumLinks.SpeciesHint"}}</p>
+  {{#if hasPacks}}
+    <div class="npc-gen-compendium-checklist">
+      {{#each speciesPacks as |pack|}}
+        <label class="npc-gen-compendium-item">
+          <input type="checkbox" class="npc-gen-link-species" value="{{pack.id}}" {{#if pack.checked}}checked{{/if}} />
+          {{pack.label}}
+        </label>
+      {{/each}}
+    </div>
+  {{/if}}
+</fieldset>
+
+<fieldset>
+  <legend>{{localize "NPC-GENERATOR-5E.CompendiumLinks.ItemsLegend"}}</legend>
+  <p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.CompendiumLinks.ItemsHint"}}</p>
+  {{#if hasPacks}}
+    <div class="npc-gen-compendium-checklist">
+      {{#each itemPacks as |pack|}}
+        <label class="npc-gen-compendium-item">
+          <input type="checkbox" class="npc-gen-link-items" value="{{pack.id}}" {{#if pack.checked}}checked{{/if}} />
+          {{pack.label}}
+        </label>
+      {{/each}}
+    </div>
+  {{/if}}
+</fieldset>
+
+<fieldset>
+  <legend>{{localize "NPC-GENERATOR-5E.CompendiumLinks.SpellsLegend"}}</legend>
+  <p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.CompendiumLinks.SpellsHint"}}</p>
+  {{#if hasPacks}}
+    <div class="npc-gen-compendium-checklist">
+      {{#each spellPacks as |pack|}}
+        <label class="npc-gen-compendium-item">
+          <input type="checkbox" class="npc-gen-link-spells" value="{{pack.id}}" {{#if pack.checked}}checked{{/if}} />
+          {{pack.label}}
+        </label>
+      {{/each}}
+    </div>
+  {{/if}}
+</fieldset>
+
+<footer class="sheet-footer">
+  <button type="button" data-action="save">
+    <i class="fa-solid fa-check"></i>
+    {{localize "NPC-GENERATOR-5E.CompendiumLinks.Save"}}
+  </button>
+</footer>
+</div>
