@@ -2,7 +2,7 @@
   "id": "npc-generator-5e",
   "title": "NPC Generator for 5e",
   "description": "Roll then review a fully-editable 5e NPC: random by CR, from a Quick Template archetype, or from a specific compendium actor, with an optional linked Species compendium. Ships with SRD 5.1 open-content NPC stat blocks and generic name/flavor/occupation/inventory tables, with optional overrides to roll on your own RollTables/compendiums.",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "compatibility": {
     "minimum": "13",
     "verified": "14"

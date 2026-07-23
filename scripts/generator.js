@@ -137,7 +137,7 @@ function buildBiography(draft) {
     `<p><strong>Bond:</strong> ${personality.bond}</p>`,
     `<p><strong>Flaw:</strong> ${personality.flaw}</p>`,
     `<p><strong>Quirk:</strong> ${personality.quirk}</p>`
-  ];
+  );
   if (draft.inventory?.length) {
     lines.push(`<p><strong>Inventory:</strong> ${draft.inventory.join(", ")}</p>`);
   }
