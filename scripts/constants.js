@@ -4,8 +4,8 @@ export const SETTINGS = {
   NAME_TABLE_UUID: "nameRollTableUuid",
   INCLUDE_BUNDLED_SRD: "includeBundledSrd",
   CUSTOM_STATBLOCK_PACK: "customStatblockPack",
-  APPEND_FLAVOR_TO_BIOGRAPHY: "appendFlavorToBiography",
-  ENABLED_TEMPLATE_COMPENDIUMS: "enabledTemplateCompendiums"
+  ENABLED_TEMPLATE_COMPENDIUMS: "enabledTemplateCompendiums",
+  ENABLED_SPECIES_COMPENDIUMS: "enabledSpeciesCompendiums"
 };
 
 export const SIZE_MAP = {

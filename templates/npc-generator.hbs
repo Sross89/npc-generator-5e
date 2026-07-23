@@ -1,10 +1,13 @@
 <div class="npc-generator-5e-form">
+
+{{#unless draft}}
 <fieldset>
   <legend>{{localize "NPC-GENERATOR-5E.App.SourceLegend"}}</legend>
   <div class="form-group">
     <label>{{localize "NPC-GENERATOR-5E.App.SourceMode"}}</label>
     <select name="sourceMode" id="npc-gen-source-mode">
       <option value="random">{{localize "NPC-GENERATOR-5E.App.SourceModeRandom"}}</option>
+      <option value="archetype">{{localize "NPC-GENERATOR-5E.App.SourceModeArchetype"}}</option>
       <option value="template">{{localize "NPC-GENERATOR-5E.App.SourceModeTemplate"}}</option>
     </select>
   </div>
@@ -53,6 +56,28 @@
   </div>
 </fieldset>
 
+<fieldset class="npc-gen-mode-archetype">
+  <legend>{{localize "NPC-GENERATOR-5E.App.ArchetypeLegend"}}</legend>
+  <div class="form-group">
+    <label>{{localize "NPC-GENERATOR-5E.App.Archetype"}}</label>
+    <select name="archetypeId">
+      <option value="">{{localize "NPC-GENERATOR-5E.App.SelectArchetype"}}</option>
+      {{#each archetypes as |arch|}}
+        <option value="{{arch.id}}">{{arch.label}}</option>
+      {{/each}}
+    </select>
+  </div>
+  <div class="form-group">
+    <label>{{localize "NPC-GENERATOR-5E.App.ArchetypeCR"}}</label>
+    <select name="archetypeCR">
+      {{#each archetypeCROptions as |opt|}}
+        <option value="{{opt.value}}">{{opt.label}}</option>
+      {{/each}}
+    </select>
+  </div>
+  <p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.App.ArchetypeHint"}}</p>
+</fieldset>
+
 <fieldset class="npc-gen-mode-template">
   <legend>{{localize "NPC-GENERATOR-5E.App.TemplateLegend"}}</legend>
 
@@ -78,88 +103,235 @@
   </div>
 
   <div class="npc-gen-actor-preview" id="npc-gen-actor-preview"></div>
-
-  <div class="form-group">
-    <label>{{localize "NPC-GENERATOR-5E.App.NameMode"}}</label>
-    <select name="nameMode" id="npc-gen-name-mode">
-      <option value="keep">{{localize "NPC-GENERATOR-5E.App.NameModeKeep"}}</option>
-      <option value="random">{{localize "NPC-GENERATOR-5E.App.NameModeRandom"}}</option>
-      <option value="custom">{{localize "NPC-GENERATOR-5E.App.NameModeCustom"}}</option>
-    </select>
-  </div>
-
-  <div class="form-group npc-gen-name-custom">
-    <label>{{localize "NPC-GENERATOR-5E.App.CustomName"}}</label>
-    <input type="text" name="customName" placeholder="{{localize 'NPC-GENERATOR-5E.App.CustomNamePlaceholder'}}" />
-  </div>
-
-  <div class="npc-gen-overrides-legend">{{localize "NPC-GENERATOR-5E.App.OverridesHint"}}</div>
-
-  <div class="npc-gen-ability-grid">
-    <div class="form-group npc-gen-ability">
-      <label>{{localize "NPC-GENERATOR-5E.App.AbilStr"}}</label>
-      <input type="number" name="abilStr" />
-    </div>
-    <div class="form-group npc-gen-ability">
-      <label>{{localize "NPC-GENERATOR-5E.App.AbilDex"}}</label>
-      <input type="number" name="abilDex" />
-    </div>
-    <div class="form-group npc-gen-ability">
-      <label>{{localize "NPC-GENERATOR-5E.App.AbilCon"}}</label>
-      <input type="number" name="abilCon" />
-    </div>
-    <div class="form-group npc-gen-ability">
-      <label>{{localize "NPC-GENERATOR-5E.App.AbilInt"}}</label>
-      <input type="number" name="abilInt" />
-    </div>
-    <div class="form-group npc-gen-ability">
-      <label>{{localize "NPC-GENERATOR-5E.App.AbilWis"}}</label>
-      <input type="number" name="abilWis" />
-    </div>
-    <div class="form-group npc-gen-ability">
-      <label>{{localize "NPC-GENERATOR-5E.App.AbilCha"}}</label>
-      <input type="number" name="abilCha" />
-    </div>
-  </div>
-
-  <div class="form-group">
-    <label>{{localize "NPC-GENERATOR-5E.App.ACOverride"}}</label>
-    <input type="number" name="acOverride" id="npc-gen-ac-override" />
-  </div>
-
-  <div class="form-group">
-    <label>{{localize "NPC-GENERATOR-5E.App.HPOverride"}}</label>
-    <input type="number" name="hpOverride" id="npc-gen-hp-override" />
-  </div>
-
-  <div class="form-group">
-    <label>{{localize "NPC-GENERATOR-5E.App.IncludeItems"}}</label>
-    <input type="checkbox" name="includeItems" checked />
-  </div>
-
-  <div class="form-group">
-    <label>{{localize "NPC-GENERATOR-5E.App.KeepArtwork"}}</label>
-    <input type="checkbox" name="keepArtwork" checked />
-  </div>
 </fieldset>
 
-<fieldset class="npc-gen-culture-fieldset">
+<fieldset>
   <legend>{{localize "NPC-GENERATOR-5E.App.FlavorLegend"}}</legend>
   <div class="form-group">
     <label>{{localize "NPC-GENERATOR-5E.App.Culture"}}</label>
     <select name="culture">
-      <option value="random">{{localize "NPC-GENERATOR-5E.App.RandomCulture"}}</option>
+      <option value="">{{localize "NPC-GENERATOR-5E.App.RandomCulture"}}</option>
       {{#each cultures as |culture|}}
         <option value="{{culture}}">{{culture}}</option>
       {{/each}}
     </select>
   </div>
+  <div class="form-group">
+    <label>{{localize "NPC-GENERATOR-5E.App.Theme"}}</label>
+    <select name="theme">
+      <option value="">{{localize "NPC-GENERATOR-5E.App.RandomTheme"}}</option>
+      {{#each themes as |theme|}}
+        <option value="{{theme.id}}">{{theme.label}}</option>
+      {{/each}}
+    </select>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>{{localize "NPC-GENERATOR-5E.App.SpeciesSetupLegend"}}</legend>
+
+  <div class="npc-gen-compendium-label">{{localize "NPC-GENERATOR-5E.App.SpeciesCompendiums"}}</div>
+  {{#if speciesCompendiums.length}}
+    <div class="npc-gen-compendium-checklist">
+      {{#each speciesCompendiums as |pack|}}
+        <label class="npc-gen-compendium-item">
+          <input type="checkbox" class="npc-gen-species-pack-checkbox" value="{{pack.id}}" {{#if pack.checked}}checked{{/if}} />
+          {{pack.label}}
+        </label>
+      {{/each}}
+    </div>
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.Species"}}</label>
+      <select name="speciesSelection">
+        <option value="random">{{localize "NPC-GENERATOR-5E.App.RandomSpecies"}}</option>
+        <option value="none">{{localize "NPC-GENERATOR-5E.App.NoneSpecies"}}</option>
+      </select>
+    </div>
+  {{else}}
+    <p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.App.NoSpeciesCompendiumsAvailable"}}</p>
+  {{/if}}
 </fieldset>
 
 <footer class="sheet-footer">
-  <button type="submit">
+  <button type="button" data-action="roll">
     <i class="fa-solid fa-dice-d20"></i>
-    {{localize "NPC-GENERATOR-5E.App.Generate"}}
+    {{localize "NPC-GENERATOR-5E.App.Roll"}}
   </button>
 </footer>
+{{/unless}}
+
+{{#if draft}}
+<div class="npc-gen-review">
+  <div class="npc-gen-chassis-line">
+    {{localize "NPC-GENERATOR-5E.App.Chassis"}}: <strong>{{draft.chassisLabel}}</strong> (CR {{draft.crLabel}})
+  </div>
+
+  <div class="npc-gen-toolbar">
+    <button type="button" data-action="reroll-all"><i class="fa-solid fa-dice-d20"></i> {{localize "NPC-GENERATOR-5E.App.RerollAll"}}</button>
+    <button type="button" data-action="back"><i class="fa-solid fa-arrow-left"></i> {{localize "NPC-GENERATOR-5E.App.StartOver"}}</button>
+  </div>
+
+  <fieldset>
+    <legend>{{localize "NPC-GENERATOR-5E.App.NameLegend"}}
+      <button type="button" class="npc-gen-reroll" data-action="reroll-name" title="{{localize 'NPC-GENERATOR-5E.App.Reroll'}}"><i class="fa-solid fa-dice-d20"></i></button>
+    </legend>
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.Name"}}</label>
+      <input type="text" data-field="name" value="{{draft.name}}" />
+    </div>
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.Gender"}}</label>
+      <select data-field="gender">
+        <option value="male">{{localize "NPC-GENERATOR-5E.App.GenderMale"}}</option>
+        <option value="female">{{localize "NPC-GENERATOR-5E.App.GenderFemale"}}</option>
+        <option value="neutral">{{localize "NPC-GENERATOR-5E.App.GenderNeutral"}}</option>
+      </select>
+      <button type="button" class="npc-gen-reroll" data-action="reroll-gender" title="{{localize 'NPC-GENERATOR-5E.App.Reroll'}}"><i class="fa-solid fa-dice-d20"></i></button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>{{localize "NPC-GENERATOR-5E.App.SpeciesLegend"}}
+      <button type="button" class="npc-gen-reroll" data-action="reroll-species" {{#unless draft.hasSpeciesPool}}disabled{{/unless}} title="{{localize 'NPC-GENERATOR-5E.App.Reroll'}}"><i class="fa-solid fa-dice-d20"></i></button>
+    </legend>
+    {{#if draft.hasSpeciesPool}}
+      <div class="form-group">
+        <label>{{localize "NPC-GENERATOR-5E.App.Species"}}</label>
+        <select data-species-select>
+          <option value="none">{{localize "NPC-GENERATOR-5E.App.NoneSpecies"}}</option>
+          {{#each draft.speciesGroups as |group|}}
+            <optgroup label="{{group.label}}">
+              {{#each group.entries as |entry|}}
+                <option value="{{entry.value}}">{{entry.name}}</option>
+              {{/each}}
+            </optgroup>
+          {{/each}}
+        </select>
+      </div>
+      {{#if draft.species}}
+        <p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.App.SpeciesAppliedHint"}}</p>
+      {{/if}}
+    {{else}}
+      <p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.App.NoSpeciesLinked"}}</p>
+    {{/if}}
+  </fieldset>
+
+  <fieldset>
+    <legend>{{localize "NPC-GENERATOR-5E.App.OccupationLegend"}}
+      <button type="button" class="npc-gen-reroll" data-action="reroll-occupation" title="{{localize 'NPC-GENERATOR-5E.App.Reroll'}}"><i class="fa-solid fa-dice-d20"></i></button>
+    </legend>
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.Theme"}}</label>
+      <select data-field="theme">
+        <option value="">{{localize "NPC-GENERATOR-5E.App.RandomTheme"}}</option>
+        {{#each themes as |theme|}}
+          <option value="{{theme.id}}">{{theme.label}}</option>
+        {{/each}}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.Occupation"}}</label>
+      <input type="text" data-field="occupation" value="{{draft.occupation}}" />
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>{{localize "NPC-GENERATOR-5E.App.AbilitiesLegend"}}
+      <button type="button" class="npc-gen-reroll" data-action="reroll-abilities" title="{{localize 'NPC-GENERATOR-5E.App.Reroll'}}"><i class="fa-solid fa-dice-d20"></i></button>
+    </legend>
+    <div class="npc-gen-ability-grid">
+      {{#each draft.abilitiesList as |abil|}}
+        <div class="form-group npc-gen-ability">
+          <label>{{abil.label}}</label>
+          <input type="number" data-field="abilities.{{abil.key}}" value="{{abil.value}}" />
+        </div>
+      {{/each}}
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>{{localize "NPC-GENERATOR-5E.App.StatSheetLegend"}}
+      <button type="button" class="npc-gen-reroll" data-action="reroll-stats" {{#unless draft.canRerollStatSheet}}disabled{{/unless}} title="{{localize 'NPC-GENERATOR-5E.App.Reroll'}}"><i class="fa-solid fa-dice-d20"></i></button>
+    </legend>
+    {{#unless draft.canRerollStatSheet}}
+      <p class="npc-gen-hint">{{localize "NPC-GENERATOR-5E.App.NoStatSheetReroll"}}</p>
+    {{/unless}}
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.ACOverride"}}</label>
+      <input type="number" data-field="stats.ac" value="{{draft.stats.ac}}" />
+    </div>
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.HPOverride"}}</label>
+      <input type="number" data-field="stats.hp" value="{{draft.stats.hp}}" />
+    </div>
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.Speed"}}</label>
+      <input type="number" data-field="stats.speed" value="{{draft.stats.speed}}" />
+    </div>
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.Senses"}}</label>
+      <input type="text" data-field="stats.senses" value="{{draft.stats.senses}}" />
+    </div>
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.IncludeItems"}}</label>
+      <input type="checkbox" data-field="includeItems" {{#if draft.includeItems}}checked{{/if}} />
+    </div>
+    {{#if draft.isCompendium}}
+      <div class="form-group">
+        <label>{{localize "NPC-GENERATOR-5E.App.KeepArtwork"}}</label>
+        <input type="checkbox" data-field="keepArtwork" {{#if draft.keepArtwork}}checked{{/if}} />
+      </div>
+    {{/if}}
+  </fieldset>
+
+  <fieldset>
+    <legend>{{localize "NPC-GENERATOR-5E.App.PersonalityLegend"}}
+      <button type="button" class="npc-gen-reroll" data-action="reroll-personality" title="{{localize 'NPC-GENERATOR-5E.App.Reroll'}}"><i class="fa-solid fa-dice-d20"></i></button>
+    </legend>
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.PersonalityTrait"}}</label>
+      <input type="text" data-field="personality.personalityTrait" value="{{draft.personality.personalityTrait}}" />
+    </div>
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.Ideal"}}</label>
+      <input type="text" data-field="personality.ideal" value="{{draft.personality.ideal}}" />
+    </div>
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.Bond"}}</label>
+      <input type="text" data-field="personality.bond" value="{{draft.personality.bond}}" />
+    </div>
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.Flaw"}}</label>
+      <input type="text" data-field="personality.flaw" value="{{draft.personality.flaw}}" />
+    </div>
+    <div class="form-group">
+      <label>{{localize "NPC-GENERATOR-5E.App.Quirk"}}</label>
+      <input type="text" data-field="personality.quirk" value="{{draft.personality.quirk}}" />
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>{{localize "NPC-GENERATOR-5E.App.InventoryLegend"}}
+      <button type="button" class="npc-gen-reroll" data-action="reroll-inventory" title="{{localize 'NPC-GENERATOR-5E.App.Reroll'}}"><i class="fa-solid fa-dice-d20"></i></button>
+    </legend>
+    <div class="npc-gen-inventory-list">
+      {{#each draft.inventory as |item|}}
+        <div class="npc-gen-inventory-row">
+          <input type="text" data-inventory-index="{{item.index}}" value="{{item.text}}" />
+          <button type="button" class="npc-gen-remove" data-remove-item="{{item.index}}" title="{{localize 'NPC-GENERATOR-5E.App.RemoveItem'}}"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      {{/each}}
+    </div>
+    <button type="button" class="npc-gen-add-item" data-action="add-item"><i class="fa-solid fa-plus"></i> {{localize "NPC-GENERATOR-5E.App.AddItem"}}</button>
+  </fieldset>
+
+  <footer class="sheet-footer">
+    <button type="button" data-action="create">
+      <i class="fa-solid fa-check"></i>
+      {{localize "NPC-GENERATOR-5E.App.Create"}}
+    </button>
+  </footer>
+</div>
+{{/if}}
+
 </div>

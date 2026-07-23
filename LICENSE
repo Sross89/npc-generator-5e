@@ -22,7 +22,13 @@ SOFTWARE.
 
 ---
 
-Stat block data in scripts/data/srd-npc-statblocks.json is derived from the
-D&D 5th Edition System Reference Document 5.1, used under the terms of the
-Open Game License v1.0a / Creative Commons license under which the SRD is
-published by Wizards of the Coast. See OGL.txt for the full license text.
+This work includes material taken from the System Reference Document 5.1
+("SRD 5.1") by Wizards of the Coast LLC and available at
+https://dnd.wizards.com/resources/systems-reference-document. The SRD 5.1 is
+licensed under the Creative Commons Attribution 4.0 International License
+available at https://creativecommons.org/licenses/by/4.0/legalcode.
+
+Specifically, scripts/data/srd-npc-statblocks.json contains NPC stat blocks
+drawn from the SRD 5.1, and scripts/data/spells.js lists SRD 5.1 spell names
+only (no spell text is reproduced). No other Wizards of the Coast content,
+trademarks, or Product Identity is used by this module.

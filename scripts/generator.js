@@ -1,44 +1,11 @@
-import { MODULE_ID, SETTINGS, SIZE_MAP, SKILL_KEY_MAP, ABILITY_KEYS } from "./constants.js";
-import { generateName } from "./data/names.js";
-import { generateFlavor } from "./data/flavor.js";
-import { buildStatblockPool, filterPoolByCR } from "./statblocks.js";
-import { getPackActor } from "./compendium.js";
+import { SIZE_MAP, SKILL_KEY_MAP, ABILITY_KEYS } from "./constants.js";
+import { rollDraftRandom, rollDraftFromTemplate, rollDraftFromArchetype } from "./draft.js";
 
 const DEFAULT_IMG = "icons/svg/mystery-man.svg";
-
-/**
- * Resolve a name either from a configured world RollTable override or the bundled generic tables.
- * @param {string} [culture]
- * @returns {Promise<{name: string, culture: string}>}
- */
-async function resolveName(culture) {
-  const tableUuid = game.settings.get(MODULE_ID, SETTINGS.NAME_TABLE_UUID)?.trim();
-  if (tableUuid) {
-    try {
-      const table = await fromUuid(tableUuid);
-      if (table) {
-        const draw = await table.draw({ displayChat: false });
-        const text = draw?.results?.[0]?.text ?? draw?.results?.[0]?.name;
-        if (text) return { name: text, culture: culture ?? "custom-table" };
-      }
-    } catch (err) {
-      console.warn(`${MODULE_ID} | Failed to draw from configured name table, falling back to bundled names.`, err);
-    }
-  }
-  return generateName({ culture });
-}
 
 function parseDarkvision(sensesText = "") {
   const match = /darkvision (\d+)\s*ft/i.exec(sensesText);
   return match ? Number(match[1]) : 0;
-}
-
-function buildAbilities(statblock) {
-  const abilities = {};
-  for (const key of ABILITY_KEYS) {
-    abilities[key] = { value: statblock.abilities?.[key] ?? 10 };
-  }
-  return abilities;
 }
 
 function buildSkills(statblock) {
@@ -144,7 +111,7 @@ function buildItems(statblock) {
     try {
       item.system.activities = buildActivity(action);
     } catch (err) {
-      console.warn(`${MODULE_ID} | Could not build a structured activity for "${action.name}"; description text is still fully populated.`, err);
+      console.warn(`NPC-GENERATOR-5E | Could not build a structured activity for "${action.name}"; description text is still fully populated.`, err);
     }
     items.push(item);
   }
@@ -152,48 +119,68 @@ function buildItems(statblock) {
   return items;
 }
 
-function buildBiography(statblock, flavor, appendFlavor) {
-  const lines = [`<p><strong>Source:</strong> ${statblock.source}</p>`];
-  if (appendFlavor) {
-    lines.push(
-      `<p><strong>Occupation:</strong> ${flavor.occupation}</p>`,
-      `<p><strong>Personality:</strong> ${flavor.personalityTrait}</p>`,
-      `<p><strong>Ideal:</strong> ${flavor.ideal}</p>`,
-      `<p><strong>Bond:</strong> ${flavor.bond}</p>`,
-      `<p><strong>Flaw:</strong> ${flavor.flaw}</p>`,
-      `<p><strong>Quirk:</strong> ${flavor.quirk}</p>`
-    );
+function sourceLabelFor(draft) {
+  if (draft.chassis.type === "bundled") return draft.chassis.statblock.source;
+  if (draft.chassis.type === "archetype") return `Quick template: ${draft.chassis.label}`;
+  return `Compendium template: ${draft.chassis.sourceActor.name}`;
+}
+
+function buildBiography(draft) {
+  const sourceLabel = sourceLabelFor(draft);
+  const { personality } = draft;
+  const lines = [`<p><strong>Source:</strong> ${sourceLabel}</p>`];
+  if (draft.species) lines.push(`<p><strong>Species:</strong> ${draft.species.name}</p>`);
+  lines.push(
+    `<p><strong>Occupation:</strong> ${draft.occupation}</p>`,
+    `<p><strong>Personality:</strong> ${personality.personalityTrait}</p>`,
+    `<p><strong>Ideal:</strong> ${personality.ideal}</p>`,
+    `<p><strong>Bond:</strong> ${personality.bond}</p>`,
+    `<p><strong>Flaw:</strong> ${personality.flaw}</p>`,
+    `<p><strong>Quirk:</strong> ${personality.quirk}</p>`
+  ];
+  if (draft.inventory?.length) {
+    lines.push(`<p><strong>Inventory:</strong> ${draft.inventory.join(", ")}</p>`);
   }
   return lines.join("\n");
 }
 
+function buildAbilitiesData(draft) {
+  const abilities = {};
+  for (const key of ABILITY_KEYS) abilities[key] = { value: Number(draft.abilities[key]) || 10 };
+  return abilities;
+}
+
 /**
- * Translate one bundled SRD statblock + rolled name/flavor into full Foundry Actor create data.
- * @param {object} statblock
- * @param {string} name
- * @param {object} flavor
- * @returns {object}
+ * The linked Species/Race item's raw data, ready to embed. Always included regardless
+ * of the "Include Weapons & Features" toggle — species is identity, not gear.
  */
-function buildActorDataFromStatblock(statblock, name, flavor) {
-  const appendFlavor = game.settings.get(MODULE_ID, SETTINGS.APPEND_FLAVOR_TO_BIOGRAPHY);
+function speciesItems(draft) {
+  if (!draft.species?.sourceItem) return [];
+  const data = draft.species.sourceItem.toObject();
+  delete data._id;
+  return [data];
+}
+
+function buildActorDataFromBundledDraft(draft) {
+  const statblock = draft.chassis.statblock;
 
   return {
-    name,
+    name: draft.name,
     type: "npc",
-    items: buildItems(statblock),
+    items: [...(draft.includeItems ? buildItems(statblock) : []), ...speciesItems(draft)],
     system: {
-      abilities: buildAbilities(statblock),
+      abilities: buildAbilitiesData(draft),
       attributes: {
-        ac: { flat: statblock.ac, calc: "flat" },
-        hp: { value: statblock.hp.average, max: statblock.hp.average, formula: statblock.hp.formula },
-        movement: { walk: Number((statblock.speed || "30").match(/\d+/)?.[0]) || 30, units: "ft" },
-        senses: { darkvision: parseDarkvision(statblock.senses), special: statblock.senses ?? "" }
+        ac: { flat: Number(draft.stats.ac), calc: "flat" },
+        hp: { value: Number(draft.stats.hp), max: Number(draft.stats.hp), formula: statblock.hp.formula },
+        movement: { walk: Number(draft.stats.speed), units: "ft" },
+        senses: { darkvision: parseDarkvision(draft.stats.senses), special: draft.stats.senses ?? "" }
       },
       details: {
         cr: statblock.cr,
         type: { value: statblock.type, subtype: statblock.subtype ?? "" },
         alignment: statblock.alignment,
-        biography: { value: buildBiography(statblock, flavor, appendFlavor) }
+        biography: { value: buildBiography(draft) }
       },
       traits: {
         size: SIZE_MAP[statblock.size] ?? "med",
@@ -204,178 +191,147 @@ function buildActorDataFromStatblock(statblock, name, flavor) {
   };
 }
 
-/**
- * Append the rolled flavor package to an actor data object's existing biography, if the
- * "append flavor" setting is enabled.
- * @param {object} data
- * @param {object} flavor
- */
-function appendFlavorToBiography(data, flavor) {
-  const appendFlavor = game.settings.get(MODULE_ID, SETTINGS.APPEND_FLAVOR_TO_BIOGRAPHY);
-  if (!appendFlavor) return;
-  const existing = foundry.utils.getProperty(data, "system.details.biography.value") ?? "";
-  const block = [
-    `<p><strong>Occupation:</strong> ${flavor.occupation}</p>`,
-    `<p><strong>Personality:</strong> ${flavor.personalityTrait}</p>`,
-    `<p><strong>Ideal:</strong> ${flavor.ideal}</p>`,
-    `<p><strong>Bond:</strong> ${flavor.bond}</p>`,
-    `<p><strong>Flaw:</strong> ${flavor.flaw}</p>`,
-    `<p><strong>Quirk:</strong> ${flavor.quirk}</p>`
-  ].join("\n");
-  foundry.utils.setProperty(data, "system.details.biography.value", `${existing}\n${block}`);
-}
-
-/**
- * Clone a compendium override Actor as the generation source, re-rolling its name and biography.
- * @param {Actor} sourceActor
- * @param {string} name
- * @param {object} flavor
- * @returns {object}
- */
-function buildActorDataFromCompendium(sourceActor, name, flavor) {
-  const data = sourceActor.toObject();
+function buildActorDataFromCompendiumDraft(draft) {
+  const data = draft.chassis.sourceActor.toObject();
   delete data._id;
-  data.name = name;
-  appendFlavorToBiography(data, flavor);
-  return data;
-}
+  data.name = draft.name;
 
-/**
- * Apply user-supplied ability score overrides (any subset of str/dex/con/int/wis/cha) onto
- * actor create data. Blank/undefined entries are left untouched so the source value carries over.
- * @param {object} data
- * @param {object|null} abilityOverrides
- */
-function applyAbilityOverrides(data, abilityOverrides) {
-  if (!abilityOverrides) return;
   for (const key of ABILITY_KEYS) {
-    const value = abilityOverrides[key];
-    if (value === null || value === undefined || value === "") continue;
-    foundry.utils.setProperty(data, `system.abilities.${key}.value`, Number(value));
-  }
-}
-
-/**
- * Clone a specifically-chosen template Actor, applying whichever overrides the user supplied.
- * @param {Actor} sourceActor
- * @param {object} opts
- * @param {string} opts.name
- * @param {object} opts.flavor
- * @param {object|null} [opts.abilityOverrides] any subset of {str,dex,con,int,wis,cha}
- * @param {number|string|null} [opts.acOverride]
- * @param {number|string|null} [opts.hpOverride]
- * @param {boolean} [opts.includeItems=true] carry over the source actor's weapons/features
- * @param {boolean} [opts.keepArtwork=true] carry over the source actor's portrait/token image
- * @returns {object}
- */
-function buildOverriddenActorData(sourceActor, {
-  name, flavor, abilityOverrides = null, acOverride = null, hpOverride = null,
-  includeItems = true, keepArtwork = true
-}) {
-  const data = sourceActor.toObject();
-  delete data._id;
-  data.name = name;
-
-  applyAbilityOverrides(data, abilityOverrides);
-
-  if (acOverride !== null && acOverride !== undefined && acOverride !== "") {
-    foundry.utils.setProperty(data, "system.attributes.ac.flat", Number(acOverride));
-    foundry.utils.setProperty(data, "system.attributes.ac.calc", "flat");
+    foundry.utils.setProperty(data, `system.abilities.${key}.value`, Number(draft.abilities[key]) || 10);
   }
 
-  if (hpOverride !== null && hpOverride !== undefined && hpOverride !== "") {
-    foundry.utils.setProperty(data, "system.attributes.hp.value", Number(hpOverride));
-    foundry.utils.setProperty(data, "system.attributes.hp.max", Number(hpOverride));
-  }
+  foundry.utils.setProperty(data, "system.attributes.ac.flat", Number(draft.stats.ac));
+  foundry.utils.setProperty(data, "system.attributes.ac.calc", "flat");
+  foundry.utils.setProperty(data, "system.attributes.hp.value", Number(draft.stats.hp));
+  foundry.utils.setProperty(data, "system.attributes.hp.max", Number(draft.stats.hp));
+  foundry.utils.setProperty(data, "system.attributes.movement.walk", Number(draft.stats.speed));
+  foundry.utils.setProperty(data, "system.attributes.senses.darkvision", parseDarkvision(draft.stats.senses));
+  foundry.utils.setProperty(data, "system.attributes.senses.special", draft.stats.senses ?? "");
 
-  if (!includeItems) data.items = [];
+  if (!draft.includeItems) data.items = [];
+  data.items = [...data.items, ...speciesItems(draft)];
 
-  if (!keepArtwork) {
+  if (!draft.keepArtwork) {
     data.img = DEFAULT_IMG;
     foundry.utils.setProperty(data, "prototypeToken.texture.src", DEFAULT_IMG);
   }
 
-  if (flavor) appendFlavorToBiography(data, flavor);
+  const existingBio = foundry.utils.getProperty(data, "system.details.biography.value") ?? "";
+  foundry.utils.setProperty(data, "system.details.biography.value", `${existingBio}\n${buildBiography(draft)}`);
 
   return data;
 }
 
-/**
- * Generate and create a new NPC Actor matching the requested parameters.
- * @param {object} params
- * @param {number|null} [params.exactCR]
- * @param {number|null} [params.minCR]
- * @param {number|null} [params.maxCR]
- * @param {string} [params.culture]
- * @param {boolean} [params.renderSheet=true]
- * @returns {Promise<Actor|null>}
- */
-export async function generateNPC({ exactCR = null, minCR = null, maxCR = null, culture = null, renderSheet = true } = {}) {
-  const pool = await buildStatblockPool();
-  const matches = filterPoolByCR(pool, { exact: exactCR, min: minCR, max: maxCR });
+/** Map a Quick Template archetype's weapon options into the same shape buildItems() expects. */
+function archetypeToActions(chassis) {
+  return chassis.attacks.map(atk => ({
+    name: atk.name,
+    type: atk.type,
+    attackBonus: chassis.attackBonus,
+    reach: atk.reach,
+    range: atk.range,
+    targets: "one target",
+    damage: [{ formula: `${atk.die}+${chassis.damageBonus}`, type: atk.damageType }]
+  }));
+}
 
-  if (!matches.length) {
-    ui.notifications.warn(game.i18n.localize("NPC-GENERATOR-5E.Warnings.NoMatch"));
-    return null;
-  }
+/** Map a Quick Template archetype's rolled spell package into a flavor-text Spellcasting trait. */
+function archetypeToTraits(chassis) {
+  if (!chassis.spellPackage) return [];
+  const { cantrips, spells } = chassis.spellPackage;
+  const spellLine = spells.length ? ` Also prepared: ${spells.join(", ")}.` : "";
+  return [{
+    name: "Spellcasting",
+    description: `${chassis.label} is a spellcaster (spell save DC ${chassis.saveDC}). Known cantrips: ${cantrips.join(", ")}.${spellLine}`
+  }];
+}
 
-  const chosen = matches[Math.floor(Math.random() * matches.length)];
-  const { name } = await resolveName(culture);
-  const flavor = generateFlavor();
+function buildActorDataFromArchetypeDraft(draft) {
+  const chassis = draft.chassis;
+  const pseudoStatblock = { traits: archetypeToTraits(chassis), actions: archetypeToActions(chassis) };
 
-  const actorData = chosen.source === "bundled"
-    ? buildActorDataFromStatblock(chosen.statblock, name, flavor)
-    : buildActorDataFromCompendium(chosen.actor, name, flavor);
-
-  return Actor.create(actorData, { renderSheet });
+  return {
+    name: draft.name,
+    type: "npc",
+    items: [...(draft.includeItems ? buildItems(pseudoStatblock) : []), ...speciesItems(draft)],
+    system: {
+      abilities: buildAbilitiesData(draft),
+      attributes: {
+        ac: { flat: Number(draft.stats.ac), calc: "flat" },
+        hp: { value: Number(draft.stats.hp), max: Number(draft.stats.hp), formula: "" },
+        movement: { walk: Number(draft.stats.speed), units: "ft" },
+        senses: { darkvision: parseDarkvision(draft.stats.senses), special: draft.stats.senses ?? "" }
+      },
+      details: {
+        cr: chassis.cr,
+        type: { value: "humanoid", subtype: "any race" },
+        alignment: "any alignment",
+        biography: { value: buildBiography(draft) }
+      },
+      traits: {
+        size: "med",
+        languages: { value: [], custom: "Common" }
+      },
+      skills: {}
+    }
+  };
 }
 
 /**
- * Generate an NPC Actor cloned from one specifically-chosen compendium template
- * (e.g. "Guard" out of a Monster Manual compendium you own), with optional overrides.
- * @param {object} params
- * @param {string} params.packId compendium pack id, e.g. "dnd5e.monsters"
- * @param {string} params.actorId id of the template Actor within that pack
- * @param {"keep"|"random"|"custom"} [params.nameMode="keep"]
- * @param {string} [params.customName] used when nameMode is "custom"
- * @param {string} [params.culture] used when nameMode is "random"
- * @param {object|null} [params.abilityOverrides] any subset of {str,dex,con,int,wis,cha}
- * @param {number|string|null} [params.acOverride]
- * @param {number|string|null} [params.hpOverride]
- * @param {boolean} [params.includeItems=true]
- * @param {boolean} [params.keepArtwork=true]
- * @param {boolean} [params.renderSheet=true]
+ * Convert a fully-reviewed draft into Foundry Actor create data.
+ * @param {object} draft
+ * @returns {object}
+ */
+export function draftToActorData(draft) {
+  if (draft.chassis.type === "bundled") return buildActorDataFromBundledDraft(draft);
+  if (draft.chassis.type === "archetype") return buildActorDataFromArchetypeDraft(draft);
+  return buildActorDataFromCompendiumDraft(draft);
+}
+
+/**
+ * Create the Actor for a fully-reviewed draft.
+ * @param {object} draft
+ * @param {boolean} [renderSheet=true]
+ * @returns {Promise<Actor>}
+ */
+export function createActorFromDraft(draft, renderSheet = true) {
+  return Actor.create(draftToActorData(draft), { renderSheet });
+}
+
+/**
+ * Convenience one-shot API for macros: roll a random-by-CR NPC and create it immediately,
+ * skipping the review UI. See the module README for parameters.
  * @returns {Promise<Actor|null>}
  */
-export async function generateNPCFromTemplate({
-  packId,
-  actorId,
-  nameMode = "keep",
-  customName = "",
-  culture = null,
-  abilityOverrides = null,
-  acOverride = null,
-  hpOverride = null,
-  includeItems = true,
-  keepArtwork = true,
-  renderSheet = true
-} = {}) {
-  const sourceActor = await getPackActor(packId, actorId);
-  if (!sourceActor) {
+export async function generateNPC(params = {}) {
+  const draft = await rollDraftRandom(params);
+  if (!draft) {
+    ui.notifications.warn(game.i18n.localize("NPC-GENERATOR-5E.Warnings.NoMatch"));
+    return null;
+  }
+  return createActorFromDraft(draft, params.renderSheet ?? true);
+}
+
+/**
+ * Convenience one-shot API for macros: roll an NPC from a specific compendium template
+ * and create it immediately, skipping the review UI. See the module README for parameters.
+ * @returns {Promise<Actor|null>}
+ */
+export async function generateNPCFromTemplate(params = {}) {
+  const draft = await rollDraftFromTemplate(params);
+  if (!draft) {
     ui.notifications.warn(game.i18n.localize("NPC-GENERATOR-5E.Warnings.TemplateNotFound"));
     return null;
   }
+  return createActorFromDraft(draft, params.renderSheet ?? true);
+}
 
-  let name;
-  if (nameMode === "custom" && customName.trim()) name = customName.trim();
-  else if (nameMode === "random") ({ name } = await resolveName(culture));
-  else name = sourceActor.name;
-
-  const flavor = generateFlavor();
-
-  const actorData = buildOverriddenActorData(sourceActor, {
-    name, flavor, abilityOverrides, acOverride, hpOverride, includeItems, keepArtwork
-  });
-
-  return Actor.create(actorData, { renderSheet });
+/**
+ * Convenience one-shot API for macros: roll a Quick Template (archetype + CR) NPC and
+ * create it immediately, skipping the review UI. See the module README for parameters.
+ * @returns {Promise<Actor|null>}
+ */
+export async function generateNPCFromArchetype(params = {}) {
+  const draft = await rollDraftFromArchetype(params);
+  return createActorFromDraft(draft, params.renderSheet ?? true);
 }

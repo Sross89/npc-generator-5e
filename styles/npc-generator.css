@@ -118,3 +118,66 @@
   font-size: 0.85em;
   opacity: 0.8;
 }
+
+.npc-generator-5e .npc-gen-review {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.npc-generator-5e .npc-gen-chassis-line {
+  margin-bottom: 0.5rem;
+}
+
+.npc-generator-5e .npc-gen-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.npc-generator-5e .npc-gen-toolbar button {
+  flex: 1;
+}
+
+.npc-generator-5e fieldset legend {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.npc-generator-5e .npc-gen-reroll {
+  flex: 0 0 auto;
+  width: 1.8rem;
+  height: 1.8rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.npc-generator-5e .npc-gen-inventory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.4rem;
+}
+
+.npc-generator-5e .npc-gen-inventory-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.npc-generator-5e .npc-gen-inventory-row input {
+  flex: 1;
+}
+
+.npc-generator-5e .npc-gen-remove {
+  flex: 0 0 auto;
+  width: 1.8rem;
+  height: 1.8rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.npc-generator-5e .npc-gen-add-item {
+  width: 100%;
+}

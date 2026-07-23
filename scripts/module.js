@@ -1,6 +1,6 @@
 import { MODULE_ID } from "./constants.js";
 import { registerSettings } from "./settings.js";
-import { generateNPC, generateNPCFromTemplate } from "./generator.js";
+import { generateNPC, generateNPCFromTemplate, generateNPCFromArchetype } from "./generator.js";
 import { NPCGeneratorApp } from "./apps/npc-generator-app.js";
 
 Hooks.once("init", () => {
@@ -9,6 +9,7 @@ Hooks.once("init", () => {
   game.modules.get(MODULE_ID).api = {
     generateNPC,
     generateNPCFromTemplate,
+    generateNPCFromArchetype,
     openGenerator: () => new NPCGeneratorApp().render(true)
   };
 });

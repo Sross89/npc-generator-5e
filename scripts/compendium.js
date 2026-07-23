@@ -53,3 +53,43 @@ export async function getPackActor(packId, actorId) {
   if (!pack) return null;
   return pack.getDocument(actorId);
 }
+
+/** All compendiums that hold Item documents, visible to the current user (for linking a Species/Race compendium). */
+export function getItemCompendiums() {
+  return game.packs
+    .filter(pack => pack.documentName === "Item" && (game.user.isGM || pack.visible))
+    .map(pack => ({ id: pack.metadata.id, label: `${pack.title} (${pack.metadata.packageName})` }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+const SPECIES_ITEM_TYPES = ["race", "species"];
+
+/**
+ * Lightweight index of the Species/Race items in an Item compendium.
+ * @param {string} packId
+ * @returns {Promise<object[]>}
+ */
+export async function getPackSpeciesIndex(packId) {
+  const pack = game.packs.get(packId);
+  if (!pack) return [];
+
+  const index = await pack.getIndex({ fields: ["img", "type"] });
+
+  return index.contents
+    .filter(entry => SPECIES_ITEM_TYPES.includes(entry.type))
+    .map(entry => ({ packId, itemId: entry._id, name: entry.name, img: entry.img }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Fetch the full Item document for a chosen species (needed for its ability score
+ * increases and traits, applied via dnd5e's own Advancement system on the actor sheet).
+ * @param {string} packId
+ * @param {string} itemId
+ * @returns {Promise<Item|null>}
+ */
+export async function getPackItem(packId, itemId) {
+  const pack = game.packs.get(packId);
+  if (!pack) return null;
+  return pack.getDocument(itemId);
+}

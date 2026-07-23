@@ -29,19 +29,19 @@ export function registerSettings() {
     default: ""
   });
 
-  game.settings.register(MODULE_ID, SETTINGS.APPEND_FLAVOR_TO_BIOGRAPHY, {
-    name: "NPC-GENERATOR-5E.Settings.AppendFlavor.Name",
-    hint: "NPC-GENERATOR-5E.Settings.AppendFlavor.Hint",
-    scope: "world",
-    config: true,
-    type: Boolean,
-    default: true
-  });
-
   // Remembers which Actor compendiums the GM has checked in the "Choose a Specific Actor"
   // panel, so the checklist doesn't reset every time the generator is reopened. Managed
   // entirely through the generator's own UI, not exposed in the Module Settings list.
   game.settings.register(MODULE_ID, SETTINGS.ENABLED_TEMPLATE_COMPENDIUMS, {
+    scope: "client",
+    config: false,
+    type: Array,
+    default: []
+  });
+
+  // Same idea, but for the Species compendium checklist used to link a Species/Race
+  // item onto every generated NPC regardless of generation mode.
+  game.settings.register(MODULE_ID, SETTINGS.ENABLED_SPECIES_COMPENDIUMS, {
     scope: "client",
     config: false,
     type: Array,
